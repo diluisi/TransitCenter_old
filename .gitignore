@@ -4,3 +4,8 @@ otp/top_code_test.ipynb
 otp/__pycache__/otp.cpython-37.pyc
 spatial/Boston_boundary.geojson
 spatial/Boston_counties.geojson
+.DS_Store
+mbta.zip
+*.jar
+*.pbf
+*.obj

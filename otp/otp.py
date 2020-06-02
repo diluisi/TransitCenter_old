@@ -96,6 +96,7 @@ class geometry:
     def osm_bounds(region, county_ids, **kwargs):
 
         file = kwargs.get('file', True)
+        raw = kwargs.get('raw', False)
         
         if file == True:
             gdf_boundary = gpd.read_file("../spatial/" + region + "_boundary.geojson")
@@ -108,19 +109,43 @@ class geometry:
         ymax = float(gdf_boundary.bounds.maxy) + 0.05
 
         command_for_clip = "osmconvert us-latest.osm.pbf -b=" + str(xmin) + "," + str(ymin) + "," + str(xmax) + "," + str(ymax) + " -o=" + region + ".osm.pbf"
-
-        return (command_for_clip)
+        
+        if raw == True:
+            return [xmin, xmax, ymin, ymax]
+        else:
+            return (command_for_clip)
 
 class build:
     
-    def build_otp():
+    def build_otp(input_date):
         
-        result = subprocess.run(['java', '-Xmx10G', '-jar', 'otp/otp-1.4.0-shaded.jar', '--build', os.getcwd()+'/otp',
+        result = subprocess.run(['java', '-Xmx8G', '-jar', 'otp-1.4.0-shaded.jar', '--build', '../otp/otp_input',
                         '--analyst'], stdout=subprocess.PIPE)
 
         with open('build_otp_log.txt', 'w') as f:
             f.truncate()
             f.write(result.stdout.decode())
             f.close()
+        
+        with open('build_otp_log.txt', 'r') as f:     
+            last_line = f.readlines()[-1]
+            f.close()
+            
+        # make sub directory for the Graphs
+        os.makedirs("graphs/graph-" + input_date, exist_ok=True)
+        
+        # move it!
+        move("otp_input/Graph.obj", "graphs/graph-" + input_date + "/Graph.obj")
+        
+        os.makedirs('../gtfs/gtfs-'+input_date, exist_ok=True)
+        
+        # Move GTFS to archive
+        gtfs_files = os.listdir("otp_input")
+        for file in gtfs_files:
+            if ".zip" in file:
+                move('otp_input/' + file, '../gtfs/gtfs-'+input_date+'/' + file)
+        
+            
+        return last_line
 
 
