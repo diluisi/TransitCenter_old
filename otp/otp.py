@@ -25,6 +25,10 @@ class study_area:
         county_ids = ["25017", "25025", "25009", "25021", "25023", "25005", "25027", "33015", "33017"]
         region = 'Boston'
         
+    class ny:
+        county_ids = ['34003','36005','36031','34017','36047','34023','34025','34027','36059','36061','34031','36081','36085','36103','34039','36119']
+        region = 'New York'
+        
 class geometry:
     def boundaries(region, county_ids, **kwargs):
         
