@@ -94,6 +94,10 @@ class geometry:
         
         # remove the block groups with an ID of 0, these pertain to those in non-tracted area (usually a waterbody)
         gdf_block_groups_poly = gdf_block_groups_poly[gdf_block_groups_poly["BLKGRPCE"] != "0"]
+        
+        pd_block_groups.to_csv("../spatial/" + region + "_block_group_pts.csv")
+        
+        gdf_block_groups_poly.to_file("../spatial/" + region + "_block_group_poly.geojson", driver='GeoJSON')
     
         
         
