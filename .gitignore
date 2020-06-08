@@ -158,3 +158,6 @@ spatial/New York_block_group_pts.csv
 spatial/New York_boundary.geojson
 spatial/New York_counties.geojson
 .DS_Store
+spatial/New York_msa_boundary.geojson
+spatial/New York_msa_block_group_pts.csv
+spatial/New York_msa_block_group_poly.geojson
