@@ -89,7 +89,7 @@ class get_destination_data:
         None
 
 
-
+    # joining SNAP grocery stores by block groups and counting occurances
     def get_groceries(self):
 
         # load in the SNAP data
