@@ -1,9 +1,13 @@
 import pandas as pd
 import numpy as np
 import urllib.request
+import gzip
+import shutil
+import os
 
-class download_destinations:
+class get_destination_data:
 
+    # initializing
     def __init__(self,region):
         self.region = region
 
@@ -23,25 +27,60 @@ class download_destinations:
         state_FIP_codes = state_FIP_codes[["Numeric code", "Alpha code"]]
         self.region_info = self.region_info.merge(state_FIP_codes, how = 'inner', left_on = "state", right_on = "Numeric code")
 
+
+        # output dataframe
+        dfo = None
+
         # download LEHD workplace data for each state.
         for state in self.region_info["Alpha code"].unique():
 
-            # download the workplace data for each state
-            file_name = state.lower() + "_wac_S000_JT00_2017.csv.gz"
-            url_name = "https://lehd.ces.census.gov/data/lodes/LODES7/" + state.lower() + "/wac/" + file_name
+            # setting up the paths
+            zip_file_name = state.lower() + "_wac_S000_JT00_2017.csv.gz"
+            csv_file_name = state.lower() + "_wac_S000_JT00_2017.csv"
+            url_name = "https://lehd.ces.census.gov/data/lodes/LODES7/" + state.lower() + "/wac/" + zip_file_name
+            file_path = "./data/" + self.region + "/destination_data/"
 
-            urllib.request.urlretrieve(url_name, "./data/" + self.region + "/" + file_name)
+            # downloading
+            urllib.request.urlretrieve(url_name, file_path + zip_file_name)
+
+            # unziping
+            with gzip.open(file_path + zip_file_name, 'rb') as f_in:
+                with open(file_path + csv_file_name, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+
+            # remove the downloaded zip file
+            os.remove(file_path + zip_file_name)
+
+            # create a field for the county ID for subsetting
+            lehd_wac = pd.read_csv(file_path + csv_file_name)
+            lehd_wac["county_id"] = (lehd_wac["w_geocode"] / 10000000000).astype(int)
+
+            # subset just for our counties
+            lehd_wac = lehd_wac[lehd_wac['county_id'].isin(self.region_info["county_id"])]
+
+            # create a field for block group
+            lehd_wac["block_group_id"] = (lehd_wac["w_geocode"] / 1000).astype(int)
+
+            # delete columns we do not want to tabulate
+            del lehd_wac['w_geocode'], lehd_wac['createdate'], lehd_wac['county_id']
+
+            # group by block_group_id and count the number of jobs
+            lehd_wac = lehd_wac.groupby(['block_group_id']).sum()
+
+            # append into the output
+            if dfo is None:
+                dfo = lehd_wac
+            else:
+                dfo = pd.concat([dfo, lehd_wac])
+
+            # remove the downlaoed unzipped csv file
+            os.remove(file_path + csv_file_name)
+
+        # save the output
+        dfo.to_csv(file_path + "lehd_employment_data.csv")
 
 
 
-
-        # IDs
-        # download LEHD data by IDs
-
-        # save somewhere?
-        # data/destination_data/Region
-
-        None
 
     def get_healthcare(self):
 
@@ -62,7 +101,7 @@ class download_destinations:
 
 
 
-test = download_destinations("Boston")
+test = get_destination_data("Boston")
 test.get_employment()
 test.get_healthcare()
 test.get_groceries()
