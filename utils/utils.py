@@ -8,17 +8,8 @@ Created on Mon Jun  8 10:36:52 2020
 
 import geopandas as gpd
 import pandas as pd
-import requests
-import json
-import csv
-from datetime import datetime 
-from time import sleep
-import os
 import urllib
 from urllib.request import urlopen
-import subprocess
-from shutil import copyfile
-from shutil import move
 
 class county_ids:
     def get_county_ids(region, extent, **kwargs):
