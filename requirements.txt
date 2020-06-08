@@ -1,1 +1,6 @@
-
+numpy==1.18.5
+pandas==1.0.4
+requests==2.23.0
+urllib3==1.25.9
+python=3.8.2=he5300dc_7_cpython
+python-dateutil=2.8.1=py_0
