@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import geopandas as gpd
+from shapely.geometry import Point
 import urllib.request
 import gzip
 import shutil
@@ -16,9 +18,6 @@ class get_destination_data:
         pdc = pdc[pdc["region_name"] == region]
         self.region_info = pdc
 
-    # function for downloading employment data from LEHD
-    def get_employment(self):
-
         # get state IDs
         self.region_info["state"] = (self.region_info["county_id"] / 1000).astype(int)
 
@@ -26,6 +25,10 @@ class get_destination_data:
         state_FIP_codes = pd.read_csv("./data/all_regions/state_FIP_codes.csv")
         state_FIP_codes = state_FIP_codes[["Numeric code", "Alpha code"]]
         self.region_info = self.region_info.merge(state_FIP_codes, how = 'inner', left_on = "state", right_on = "Numeric code")
+
+
+    # function for downloading employment data from LEHD
+    def get_employment(self):
 
 
         # output dataframe
@@ -81,17 +84,47 @@ class get_destination_data:
 
 
 
-
     def get_healthcare(self):
 
-        # place
-
         None
+
 
 
     def get_groceries(self):
 
-        None
+        # load in the SNAP data
+        snap = pd.read_csv("./data/all_regions/snap_retailers_usda.csv")
+
+        # subset just for our counties
+        snap = snap[snap['state'].isin(self.region_info["Alpha code"])]
+
+        # subset just for 2019
+        snap = snap[(snap['Y2019'] == 1)]
+
+        # reduce size of dataframe
+        snap = snap[["store_id","Y2019","X","Y"]]
+
+        # turn into a geodataframe
+        snap_geometry = [Point(xy) for xy in zip(snap.X, snap.Y)]
+        snap = snap.drop(['X', 'Y'], axis=1)
+        crs = 'epsg:4269'
+        snap = gpd.GeoDataFrame(snap, crs=crs, geometry=snap_geometry)
+
+        # load in block group polygons
+        bgpoly = gpd.read_file("./data/" + self.region + "/spatial_data/" + self.region + "_block_group_poly.geojson")
+
+        # spatial join the block groups to the points
+        snap = gpd.sjoin(snap, bgpoly, how="inner", op='intersects')
+
+        # group by block_group_id and count the number of jobs
+        snap = snap.groupby(['GEOID']).sum()[["Y2019"]]
+
+        # update the column names
+        snap.columns = ["snap"]
+
+        # write to file
+        file_path = "./data/" + self.region + "/destination_data/"
+        snap.to_csv(file_path + "snap_data.csv")
 
 
     def get_parks(self):
@@ -102,7 +135,7 @@ class get_destination_data:
 
 
 test = get_destination_data("Boston")
-test.get_employment()
+# test.get_employment()
 test.get_healthcare()
 test.get_groceries()
 test.get_parks()
