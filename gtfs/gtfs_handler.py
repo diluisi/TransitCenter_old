@@ -15,8 +15,10 @@ import urllib
 
 
 def get_gtfs(region, county_ids, input_date, xmin, xmax, ymin, ymax):
+    
 
-# date into an in order to properly check dates
+
+    # date into an in order to properly check dates
     
     
     input_date_int = 10000 * int(input_date[0:4]) + 100 * int(input_date[5:7]) + int(input_date[8:10])

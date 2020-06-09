@@ -9,12 +9,28 @@ Created on Fri May 29 15:15:31 2020
 import os
 import subprocess
 from shutil import move
+from datetime import datetime
 
 
 class build:
     
     def build_otp(input_date):
+        '''
         
+        Calls a shell command to build the OTP graph
+        Will run if the GTFS data, OSM data, and .jar file are in their associated directories.
+
+        Parameters
+        ----------
+        input_date : string
+            date when the GTFS files were pulled.
+
+        Returns
+        -------
+        last_line : string
+            time it took to run the command, or if the command failed
+
+        '''
         
         # Move gtfs files
         gtfs_files = os.listdir('../gtfs/feeds_'+input_date)
@@ -24,7 +40,8 @@ class build:
         
         result = subprocess.run(['java', '-Xmx8G', '-jar', 'otp-1.4.0-shaded.jar', '--build', '../otp/otp_input',
                         '--analyst'], stdout=subprocess.PIPE)
-
+        
+        # writes a log of the shell output
         with open('build_otp_log.txt', 'w') as f:
             f.truncate()
             f.write(result.stdout.decode())
@@ -51,6 +68,8 @@ class build:
             
         return last_line
 
+if __name__ == '__main__':
+    build.build_otp(str(datetime.date(datetime.now())))
 
 
 

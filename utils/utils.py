@@ -13,12 +13,33 @@ from urllib.request import urlopen
 
 class county_ids:
     def get_county_ids(region, extent, **kwargs):
+        '''
         
+        Reads the county ids csv and returns ids for inputted region.
+
+        Parameters
+        ----------
+        region : string
+            name of region
+        extent : string 
+            options are 'core'-for counties containing the urban centres, 'msa - for counties in MSA, 'region' - for counties in TC region
+        names : boolean
+            returns names of counties if specified
+
+        Returns
+        -------
+        data : list
+            list containing county ids
+            If names is specified, format will be a nested list.
+
+        '''
+        
+        # reads file
         data = pd.read_csv('data/county_ids.csv')
         names = kwargs.get('names', False)
         data['county_id'] = data['county_id'].astype(str)
         
-        
+        # filters the data based on extent
         if extent == 'core':
             df = data[(data['region_name'] == region) & (data['core'] == True)]
         elif extent == 'msa':
@@ -42,6 +63,26 @@ class county_ids:
 
 class geometry:
     def boundaries(region, county_ids, extent, **kwargs):
+        '''
+        
+
+        Parameters
+        ----------
+        region : string
+            region name
+        county_ids : string
+            list of county ids
+        extent : string
+            extent type
+            options are 'core', 'msa', or 'region'
+        in_memory : boolean
+            True if the output should be returned instead of being written as a file
+
+        Returns
+        -------
+        gdf_region : is in_memory is True, will return the results as a GeoDataframe
+
+        '''
         
         # flag to indicate whether the data should be returned in memory
         in_memory = kwargs.get('in_memory', False)
@@ -66,7 +107,25 @@ class geometry:
         
         
     def block_groups(region, county_ids, extent):
+        '''
         
+
+        Parameters
+        ----------
+        region : string
+            region name
+        county_ids : string
+            list of county ids
+        extent : string
+            extent type
+            options are 'core', 'msa', or 'region'
+
+        Returns
+        -------
+        None.
+            Will write outputs to a file
+
+        '''
   
         
         # download and into a pandas dataframe
@@ -113,6 +172,31 @@ class geometry:
         
         
     def osm_bounds(region, county_ids, extent, **kwargs):
+        '''
+        
+
+        Parameters
+        ----------
+        region : string
+            region name
+        county_ids : string
+            list of county ids
+        extent : string
+            extent type
+            options are 'core', 'msa', or 'region'
+        file : boolean
+            False to call the boundaries function instead of reading the file from the disk.
+        raw : boolean
+            True if only the coordinates of the bounding box is wanted instead of the osmconvert command
+
+        Returns
+        -------
+        command : string
+            command for the osmconvert shell command
+        coordinate : list
+            lat/lon coordinates
+
+        '''
 
         file = kwargs.get('file', True)
         raw = kwargs.get('raw', False)
@@ -120,8 +204,9 @@ class geometry:
         if file == True:
             gdf_boundary = gpd.read_file("../spatial/" + region + '_' + extent +  "_boundary.geojson")
         else:
-            gdf_boundary = geometry.boundaries(region, county_ids, in_memory = True)
+            gdf_boundary = geometry.boundaries(region, county_ids, extent, in_memory = True)
         
+        # adds buffer to the bounds
         xmin = float(gdf_boundary.bounds.minx) - 0.05
         xmax = float(gdf_boundary.bounds.maxx) + 0.05
         ymin = float(gdf_boundary.bounds.miny) - 0.05
