@@ -161,3 +161,14 @@ spatial/New York_counties.geojson
 spatial/New York_msa_boundary.geojson
 spatial/New York_msa_block_group_pts.csv
 spatial/New York_msa_block_group_poly.geojson
+spatial/Chicago_boundary.geojson
+spatial/Chicago_counties.geojson
+spatial/District of Columbia_boundary.geojson
+spatial/District of Columbia_counties.geojson
+spatial/Los Angeles_boundary.geojson
+spatial/Los Angeles_counties.geojson
+spatial/Philadelphia_boundary.geojson
+spatial/Philadelphia_counties.geojson
+spatial/San Francisco-Oakland_boundary.geojson
+spatial/San Francisco-Oakland_counties.geojson
+gtfs/feeds_2020-05-01/New York_feed_info_2020-05-01.csv

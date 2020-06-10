@@ -42,20 +42,20 @@ class build:
                         '--analyst'], stdout=subprocess.PIPE)
         
         # writes a log of the shell output
-        with open('build_otp_log.txt', 'w') as f:
+        with open('../otp/build_otp_log.txt', 'w') as f:
             f.truncate()
             f.write(result.stdout.decode())
             f.close()
         
-        with open('build_otp_log.txt', 'r') as f:     
+        with open('../otp/build_otp_log.txt', 'r') as f:     
             last_line = f.readlines()[-1]
             f.close()
             
         # make sub directory for the Graphs
-        os.makedirs("graphs/graph-" + input_date, exist_ok=True)
+        os.makedirs("../otp/graphs/graph-" + input_date, exist_ok=True)
         
         # move it!
-        move("otp_input/Graph.obj", "graphs/graph-" + input_date + "/Graph.obj")
+        move("../otp/otp_input/Graph.obj", "../otp/graphs/graph-" + input_date + "/Graph.obj")
         
         os.makedirs('../gtfs/feeds_'+input_date, exist_ok=True)
         
@@ -63,7 +63,7 @@ class build:
         gtfs_files = os.listdir("otp_input")
         for file in gtfs_files:
             if ".zip" in file:
-                move('otp_input/' + file, '../gtfs/feeds_'+input_date+'/' + file)
+                move('../otp/otp_input/' + file, '../gtfs/feeds_'+input_date+'/' + file)
         
             
         return last_line

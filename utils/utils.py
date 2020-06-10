@@ -35,9 +35,9 @@ class county_ids:
         '''
         
         # reads file
-        data = pd.read_csv('data/county_ids.csv')
+        data = pd.read_csv('../utils/data/county_ids.csv', converters={'county_id': lambda x: str(x)})
         names = kwargs.get('names', False)
-        data['county_id'] = data['county_id'].astype(str)
+        
         
         # filters the data based on extent
         if extent == 'core':
@@ -194,7 +194,7 @@ class geometry:
         command : string
             command for the osmconvert shell command
         coordinate : list
-            lat/lon coordinates
+            lat/lon coordinates in the form of xmin, xmax, ymin, ymax
 
         '''
 
