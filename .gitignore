@@ -172,3 +172,24 @@ spatial/Philadelphia_counties.geojson
 spatial/San Francisco-Oakland_boundary.geojson
 spatial/San Francisco-Oakland_counties.geojson
 gtfs/feeds_2020-05-01/New York_feed_info_2020-05-01.csv
+spatial/Boston_region_block_group_poly.geojson
+spatial/Boston_region_block_group_pts.csv
+spatial/Boston_region_boundary.geojson
+spatial/Chicago_region_block_group_poly.geojson
+spatial/Chicago_region_block_group_pts.csv
+spatial/Chicago_region_boundary.geojson
+spatial/District of Columbia_region_block_group_poly.geojson
+spatial/District of Columbia_region_block_group_pts.csv
+spatial/District of Columbia_region_boundary.geojson
+spatial/Los Angeles_region_block_group_poly.geojson
+spatial/Los Angeles_region_block_group_pts.csv
+spatial/Los Angeles_region_boundary.geojson
+spatial/New York_region_block_group_poly.geojson
+spatial/New York_region_block_group_pts.csv
+spatial/New York_region_boundary.geojson
+spatial/Philadelphia_region_block_group_poly.geojson
+spatial/Philadelphia_region_block_group_pts.csv
+spatial/Philadelphia_region_boundary.geojson
+spatial/San Francisco-Oakland_region_block_group_poly.geojson
+spatial/San Francisco-Oakland_region_block_group_pts.csv
+spatial/San Francisco-Oakland_region_boundary.geojson
