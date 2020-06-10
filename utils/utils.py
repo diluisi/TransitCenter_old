@@ -22,7 +22,7 @@ class county_ids:
         region : string
             name of region
         extent : string 
-            options are 'core'-for counties containing the urban centres, 'msa - for counties in MSA, 'region' - for counties in TC region
+            options are 'core'-for counties containing the urban centres, 'msa - for counties in MSA, 'region' - for counties in TC region, 'all' for all counties
         names : boolean
             returns names of counties if specified
 
@@ -74,7 +74,7 @@ class geometry:
             list of county ids
         extent : string
             extent type
-            options are 'core', 'msa', or 'region'
+            options are 'core', 'msa', 'region', or all
         in_memory : boolean
             True if the output should be returned instead of being written as a file
 
@@ -118,7 +118,7 @@ class geometry:
             list of county ids
         extent : string
             extent type
-            options are 'core', 'msa', or 'region'
+            options are 'core', 'msa', 'region', or all
 
         Returns
         -------
@@ -183,7 +183,7 @@ class geometry:
             list of county ids
         extent : string
             extent type
-            options are 'core', 'msa', or 'region'
+            options are 'core', 'msa', 'region', or 'all'
         file : boolean
             False to call the boundaries function instead of reading the file from the disk.
         raw : boolean

@@ -193,3 +193,5 @@ spatial/Philadelphia_region_boundary.geojson
 spatial/San Francisco-Oakland_region_block_group_poly.geojson
 spatial/San Francisco-Oakland_region_block_group_pts.csv
 spatial/San Francisco-Oakland_region_boundary.geojson
+spatial/New York_all_block_group_poly.geojson
+spatial/New York_all_block_group_pts.csv
