@@ -97,6 +97,11 @@ class geometry:
         gdf_region = gdf_counties.dissolve(by="LSAD")
         gdf_region["name"] = region 
         gdf_region = gdf_region[["geometry","name"]]
+        
+        # dissolving for Washington DC bug
+        gdf_region = gdf_region.dissolve(by= 'name', aggfunc='sum')
+        
+        
         gdf_region.to_file("../spatial/" + region + "_boundary.geojson", driver='GeoJSON')
         
         if in_memory == True:

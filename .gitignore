@@ -195,3 +195,17 @@ spatial/San Francisco-Oakland_region_block_group_pts.csv
 spatial/San Francisco-Oakland_region_boundary.geojson
 spatial/New York_all_block_group_poly.geojson
 spatial/New York_all_block_group_pts.csv
+gtfs/feeds_2020-06-10/Boston_feed_info_2020-06-10.csv
+gtfs/feeds_2020-06-10/Chicago_feed_info_2020-06-10.csv
+gtfs/feeds_2020-06-10/District of Columbia_feed_info_2020-06-10.csv
+gtfs/feeds_2020-06-10/Los Angeles_feed_info_2020-06-10.csv
+gtfs/feeds_2020-06-10/New York_feed_info_2020-06-10.csv
+gtfs/feeds_2020-06-10/Philadelphia_feed_info_2020-06-10.csv
+gtfs/feeds_2020-06-10/San Francisco-Oakland_feed_info_2020-06-10.csv
+gtfs/feeds_2020-06-11/Boston_feed_info_2020-06-11.csv
+gtfs/feeds_2020-06-11/Chicago_feed_info_2020-06-11.csv
+gtfs/feeds_2020-06-11/District of Columbia_feed_info_2020-06-11.csv
+gtfs/feeds_2020-06-11/Los Angeles_feed_info_2020-06-11.csv
+gtfs/feeds_2020-06-11/New York_feed_info_2020-06-11.csv
+gtfs/feeds_2020-06-11/Philadelphia_feed_info_2020-06-11.csv
+gtfs/feeds_2020-06-11/San Francisco-Oakland_feed_info_2020-06-11.csv

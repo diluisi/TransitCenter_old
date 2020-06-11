@@ -120,16 +120,5 @@ class get:
                 sleep(1)
             except:
                 None
-                
-                
-class clean:
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     
