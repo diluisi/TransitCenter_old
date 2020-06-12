@@ -1,3 +1,31 @@
+"""
+
+(still in progress)
+
+The functions in this class downloads destination data for different study regions,
+based on their county IDs. It then links these data to census block groups based
+on their GEOID or based on their spatial location. Requiremets are the data_util.cfg
+file noting the where data will be downloaded to, and a of course a working internet
+connection. Example for running is as follows
+
+# setup, init
+regionDL = get_destination_data("Boston")
+
+# download LEHD employment data
+regionDL.get_employment()
+
+# join healthcare data to blocks groups
+regionDL.get_healthcare()
+
+# join SNAP grocery store data to block groups
+regionDL.get_groceries()
+
+# download and join greenspace and parks from OSM to block groups
+regionDL.get_parks()
+
+"""
+
+
 import pandas as pd
 import numpy as np
 import geopandas as gpd
@@ -6,6 +34,8 @@ import urllib.request
 import gzip
 import shutil
 import os
+import json
+
 
 class get_destination_data:
 
@@ -13,8 +43,24 @@ class get_destination_data:
     def __init__(self,region):
         self.region = region
 
+        # load in file paths
+        with open('utils/data_folder.cfg', 'r') as d:
+            d = d.read()
+        self.data_paths = json.loads(d)
+
+        # file paths for nationwide_data
+        self.data_folder_path = self.data_paths["folder_path"] + self.data_paths["folder_name"]
+        self.region_folder_path = self.data_folder_path + self.data_paths["contents"]["region_data"]["folder_name"][self.region]
+        self.input_data_path = self.region_folder_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["folder_name"]
+        print("We will be saving data to ", self.input_data_path)
+
+
+        # paths for nationwide_data thats needed
+        state_FIP_codes_path = self.data_folder_path + self.data_paths["contents"]["nationwide_data"]["folder_name"] + self.data_paths["contents"]["nationwide_data"]["contents"]["state_FIP_codes"]
+        county_ids_path = self.data_folder_path + self.data_paths["contents"]["nationwide_data"]["folder_name"] + self.data_paths["contents"]["nationwide_data"]["contents"]["county_ids"]
+
         # grab info needed by county for downloading data
-        pdc = pd.read_csv("./data/county_ids.csv") # change later
+        pdc = pd.read_csv(county_ids_path)
         pdc = pdc[pdc["region_name"] == region]
         self.region_info = pdc
 
@@ -22,31 +68,37 @@ class get_destination_data:
         self.region_info["state"] = (self.region_info["county_id"] / 1000).astype(int)
 
         # our counties have numeric FIP codes, while the LEHD data has alpha codes, so we need to make a link to download data just four our states
-        state_FIP_codes = pd.read_csv("./data/all_regions/state_FIP_codes.csv")
+        state_FIP_codes = pd.read_csv(state_FIP_codes_path)
         state_FIP_codes = state_FIP_codes[["Numeric code", "Alpha code"]]
         self.region_info = self.region_info.merge(state_FIP_codes, how = 'inner', left_on = "state", right_on = "Numeric code")
 
 
-    # function for downloading employment data from LEHD
+    # function for downloading employment data from LEHD and summarizing by block group
     def get_employment(self):
 
+        print("Downloading LEHD employment data and joining to block groups")
 
         # output dataframe
         dfo = None
 
+        # set up path for where to download and store the data
+        file_path = self.region_folder_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["folder_name"]
+        output_file_path = file_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["contents"]["employment_lehd"]
+
         # download LEHD workplace data for each state.
         for state in self.region_info["Alpha code"].unique():
 
-            # setting up the paths
+            # setting up the file naming needed for downloading
             zip_file_name = state.lower() + "_wac_S000_JT00_2017.csv.gz"
             csv_file_name = state.lower() + "_wac_S000_JT00_2017.csv"
             url_name = "https://lehd.ces.census.gov/data/lodes/LODES7/" + state.lower() + "/wac/" + zip_file_name
-            file_path = "./data/" + self.region + "/destination_data/"
+
+            # print(file_path + zip_file_name)
 
             # downloading
             urllib.request.urlretrieve(url_name, file_path + zip_file_name)
 
-            # unziping
+            # unzipings
             with gzip.open(file_path + zip_file_name, 'rb') as f_in:
                 with open(file_path + csv_file_name, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
@@ -80,7 +132,7 @@ class get_destination_data:
             os.remove(file_path + csv_file_name)
 
         # save the output
-        dfo.to_csv(file_path + "lehd_employment_data.csv")
+        dfo.to_csv(output_file_path)
 
 
 
@@ -89,11 +141,21 @@ class get_destination_data:
         None
 
 
+
     # joining SNAP grocery stores by block groups and counting occurances
     def get_groceries(self):
 
+        print("Joining SNAP grocery stores by block groups and counting the number of stores per block group")
+
+        # set paths for input data
+        all_snap_file_path = self.data_folder_path + self.data_paths["contents"]["nationwide_data"]["folder_name"] + self.data_paths["contents"]["nationwide_data"]["contents"]["snap_retailers_usda"]
+        block_group_poly_path = self.input_data_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["contents"]["block_group_polygons"]
+
+        # folder to where we are going to save the output data
+        output_file_path = self.input_data_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["contents"]["groceries_snap"]
+
         # load in the SNAP data
-        snap = pd.read_csv("./data/all_regions/snap_retailers_usda.csv")
+        snap = pd.read_csv(all_snap_file_path)
 
         # subset just for our counties
         snap = snap[snap['state'].isin(self.region_info["Alpha code"])]
@@ -111,7 +173,7 @@ class get_destination_data:
         snap = gpd.GeoDataFrame(snap, crs=crs, geometry=snap_geometry)
 
         # load in block group polygons
-        bgpoly = gpd.read_file("./data/" + self.region + "/spatial_data/" + self.region + "_block_group_poly.geojson")
+        bgpoly = gpd.read_file(block_group_poly_path)
 
         # spatial join the block groups to the points
         snap = gpd.sjoin(snap, bgpoly, how="inner", op='intersects')
@@ -123,19 +185,9 @@ class get_destination_data:
         snap.columns = ["snap"]
 
         # write to file
-        file_path = "./data/" + self.region + "/destination_data/"
-        snap.to_csv(file_path + "snap_data.csv")
+        snap.to_csv(output_file_path)
 
 
     def get_parks(self):
 
         None
-
-
-
-
-test = get_destination_data("Boston")
-# test.get_employment()
-test.get_healthcare()
-test.get_groceries()
-test.get_parks()

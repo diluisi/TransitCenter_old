@@ -1,2 +1,6 @@
 # data directory
 data/
+utils/__pycache__/
+
+requirements.txt
+test.py
