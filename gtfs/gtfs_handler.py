@@ -11,10 +11,16 @@ import csv
 from time import sleep
 import os
 import urllib
-
+import pandas as pd
+from shapely.geometry import Point, Polygon
+import time
+import datetime
+from datetime import datetime
+from datetime import timedelta  
+import geopandas 
 
 class get:
-    def get_gtfs(region, county_ids, input_date, xmin, xmax, ymin, ymax):
+    def transit_land(region, county_ids, input_date, xmin, xmax, ymin, ymax):
         
         
         
@@ -120,5 +126,96 @@ class get:
                 sleep(1)
             except:
                 None
+                
+    def transit_feeds(region, county_ids, input_date, xmin, xmax, ymin, ymax):
+        
+        #TODO config file
+        key = 'f2a91a7e-154d-434a-8083-2cd18e25f3d2'
 
+        coords = [(xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin)]
+        poly = Polygon(coords)
+        
+        s = requests.Session()
+        
+        url = 'https://api.transitfeeds.com'
+        gtfs_url = 'https://transitfeeds.com/p/'
+        
+        response = s.get(
+            url+'/v1/getLocations',
+            params = {'key': key
+               
+            }
+        )
+        locations = response.json()['results']['locations']
+        sleep(15)
+        
+        # filters locations to only those within bounding box
+
+        location_ids = []
+        for operator in locations:
+            pt = Point(operator['lng'], operator['lat'])
+            if pt.within(poly) is True: 
+                location_ids.append(operator['id'])
+        
+        os.makedirs("../gtfs/feeds_" + input_date, exist_ok=True)
+        
+        # loops through all locations
+
+        id_lst = []
+        for ids in location_ids:
+            for attempt in range(4):
+                try: 
+                    response = s.get(
+                        url+'/v1/getFeeds',
+                        params = {'key': key, 'location' : ids, 'type': 'gtfs', 'limit': 200
+        
+                        }
+                    )
+                    feeds = response.json()['results']['feeds']
+                    for agencies in feeds:
+                        ts = agencies['latest']['ts']
+                        dt_str = str(datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d'))
+                        name = agencies['t']
+                        loc = agencies['l']['t']
+                        dt_fetched = str(datetime.utcfromtimestamp(ts).strftime('%Y%m%d'))
+                        id_lst.append(list([agencies['id'], dt_fetched, name, loc, dt_str]))
+                    sleep(1)
+                    break
+                except:
+                    print(attempt)
+                    sleep(10)
+                    
+        for agency in id_lst:
+            print(agency[0])
+            
+            # to account for timezone issues
+            for attempt in range(3):
+                try:
+                    if attempt == 0:
+                        url = gtfs_url + agency[0] + '/' + agency[1] + '/download'
+                        urllib.request.urlretrieve(url, "../gtfs/feeds_" + input_date + 
+                                               "/" + agency[2] + '-' + input_date + ".zip")
+                        break
+                    elif attempt == 1:
+                        bkwd_dt = str((datetime.strptime(id_lst[0][1], '%Y%m%d') + timedelta(days=1)).date().strftime('%Y%m%d'))   
+                        url = gtfs_url + agency[0] + '/' + bkwd_dt + '/download'
+                        urllib.request.urlretrieve(url, "../gtfs/feeds_" + input_date + 
+                                               "/" + agency[2] + '-' + input_date + ".zip")
+                        break
+                    elif attempt == 2:
+                        fwd_dt = str((datetime.strptime(id_lst[0][1], '%Y%m%d') - timedelta(days=1)).date().strftime('%Y%m%d'))   
+                        url = gtfs_url + agency[0] + '/' + fwd_dt + '/download'
+                        urllib.request.urlretrieve(url, "../gtfs/feeds_" + input_date + 
+                                               "/" + agency[2] + '-' + input_date + ".zip")
+                        break
+                    else:
+                        print('Skipping due to error')
+                except:
+                    pass
+        
+        #TODO reformat output csv
+        with open("../gtfs/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", "w") as csvfile:
+            writer = csv.writer(csvfile)
+            for row in id_lst:
+                writer.writerow(row)
     

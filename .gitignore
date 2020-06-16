@@ -209,3 +209,11 @@ gtfs/feeds_2020-06-11/Los Angeles_feed_info_2020-06-11.csv
 gtfs/feeds_2020-06-11/New York_feed_info_2020-06-11.csv
 gtfs/feeds_2020-06-11/Philadelphia_feed_info_2020-06-11.csv
 gtfs/feeds_2020-06-11/San Francisco-Oakland_feed_info_2020-06-11.csv
+otp/otp_input/mbta/agency.txt
+otp/otp_input/mbta/calendar.txt
+otp/otp_input/mbta/calendar_dates.txt
+otp/otp_input/mbta/routes.txt
+otp/otp_input/mbta/shapes.txt
+otp/otp_input/mbta/stop_times.txt
+otp/otp_input/mbta/stops.txt
+otp/otp_input/mbta/trips.txt
