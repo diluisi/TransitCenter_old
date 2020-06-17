@@ -217,3 +217,5 @@ otp/otp_input/mbta/shapes.txt
 otp/otp_input/mbta/stop_times.txt
 otp/otp_input/mbta/stops.txt
 otp/otp_input/mbta/trips.txt
+*.cfg
+gtfs/feeds_2020-06-15/Chicago_feed_info_2020-06-15.csv

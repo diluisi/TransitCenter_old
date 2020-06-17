@@ -1,0 +1,4 @@
+operator_name,operator_url,operator_region,transit_feeds_id,date_fetched,earliest_calendar_date,latest_calendar_date,transitfeeds_url
+Pace Bus GTFS,https://www.pacebus.com,"Chicago, IL, USA",pace/171,2020-04-11,2020-04-13,2020-08-29,https://transitfeeds.com/p/pace/171/20200410/download
+Metra GTFS,,"Chicago, IL, USA",metra/169,2020-06-13,,,https://transitfeeds.com/p/metra/169/20200613/download
+CTA GTFS,http://transitchicago.com,"Chicago, IL, USA",chicago-transit-authority/165,2020-06-13,2020-06-10,2020-08-31,https://transitfeeds.com/p/chicago-transit-authority/165/20200613/download

@@ -18,8 +18,14 @@ import datetime
 from datetime import datetime
 from datetime import timedelta  
 import geopandas 
+import configparser
+from gtfslite import GTFS
 
 class get:
+
+    config = configparser.ConfigParser()
+    config.read('../config.cfg')
+
     def transit_land(region, county_ids, input_date, xmin, xmax, ymin, ymax):
         
         
@@ -50,15 +56,14 @@ class get:
         
         # loop over feed info, getting info for each feed, and saving to an output array
         
-        output_feed_info = [["operator_name", "operator_website", "operator_state", "operator_metro", "operator_timezone", "transitland_feed_id", "date_fetched", "earliest_calendar_date", "latest_calendar_date", "transitland_historical_url"]]
+        output_feed_info = [["operator_name", "operator_website", "operator_metro", "feed_id", "date_fetched", "earliest_calendar_date", "latest_calendar_date", "url"]]
         for feed_info in feed_base_info:
             
             # base info
             operator_name = feed_info[1]
             operator_website = feed_info[2]
-            operator_state = feed_info[3]
             operator_metro = feed_info[4]
-            operator_timezone = feed_info[5]
+            
             
             # get feed versions
             response = requests.get(
@@ -94,7 +99,7 @@ class get:
                             latest_calendar_date = feeds["feed_versions"][i]["latest_calendar_date"]
                             transitland_historical_url = feeds["feed_versions"][i]["download_url"]
                             feed_id = feeds["feed_versions"][i]["feed"]                    
-                            output_feed_info.append([operator_name, operator_website, operator_state, operator_metro, operator_timezone, feed_id, date_fetched, earliest_calendar_date, latest_calendar_date, transitland_historical_url])
+                            output_feed_info.append([operator_name, operator_website, operator_metro, feed_id, date_fetched, earliest_calendar_date, latest_calendar_date, transitland_historical_url])
                             
                             break # break since this should be the most recent
         
@@ -115,7 +120,7 @@ class get:
             writer = csv.writer(csvfile)
             for row in output_feed_info:
                 writer.writerow(row)
-                gtfs_zip = [row[5],row[9]]
+                gtfs_zip = [row[0],row[7]]
                 if gtfs_zip not in gtfs_zips_to_dl:
                     gtfs_zips_to_dl.append(gtfs_zip)
             
@@ -129,9 +134,7 @@ class get:
                 
     def transit_feeds(region, county_ids, input_date, xmin, xmax, ymin, ymax):
         
-        #TODO config file
-        key = 'f2a91a7e-154d-434a-8083-2cd18e25f3d2'
-
+        key = get.config['GTFS']['key']
         coords = [(xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin)]
         poly = Polygon(coords)
         
@@ -146,9 +149,10 @@ class get:
                
             }
         )
+
+
         locations = response.json()['results']['locations']
         sleep(15)
-        
         # filters locations to only those within bounding box
 
         location_ids = []
@@ -160,62 +164,78 @@ class get:
         os.makedirs("../gtfs/feeds_" + input_date, exist_ok=True)
         
         # loops through all locations
-
-        id_lst = []
+        feed_info_lst = []
+        
         for ids in location_ids:
-            for attempt in range(4):
-                try: 
-                    response = s.get(
-                        url+'/v1/getFeeds',
-                        params = {'key': key, 'location' : ids, 'type': 'gtfs', 'limit': 200
-        
-                        }
-                    )
-                    feeds = response.json()['results']['feeds']
-                    for agencies in feeds:
-                        ts = agencies['latest']['ts']
-                        dt_str = str(datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d'))
-                        name = agencies['t']
-                        loc = agencies['l']['t']
-                        dt_fetched = str(datetime.utcfromtimestamp(ts).strftime('%Y%m%d'))
-                        id_lst.append(list([agencies['id'], dt_fetched, name, loc, dt_str]))
-                    sleep(1)
-                    break
-                except:
-                    print(attempt)
-                    sleep(10)
-                    
-        for agency in id_lst:
-            print(agency[0])
+
+                
+            response = s.get(
+                url+'/v1/getFeeds',
+                params = {'key': key, 'location' : ids, 'type': 'gtfs', 'limit': 200
+
+                }
+            )
             
-            # to account for timezone issues
-            for attempt in range(3):
-                try:
-                    if attempt == 0:
-                        url = gtfs_url + agency[0] + '/' + agency[1] + '/download'
-                        urllib.request.urlretrieve(url, "../gtfs/feeds_" + input_date + 
-                                               "/" + agency[2] + '-' + input_date + ".zip")
-                        break
-                    elif attempt == 1:
-                        bkwd_dt = str((datetime.strptime(id_lst[0][1], '%Y%m%d') + timedelta(days=1)).date().strftime('%Y%m%d'))   
-                        url = gtfs_url + agency[0] + '/' + bkwd_dt + '/download'
-                        urllib.request.urlretrieve(url, "../gtfs/feeds_" + input_date + 
-                                               "/" + agency[2] + '-' + input_date + ".zip")
-                        break
-                    elif attempt == 2:
-                        fwd_dt = str((datetime.strptime(id_lst[0][1], '%Y%m%d') - timedelta(days=1)).date().strftime('%Y%m%d'))   
-                        url = gtfs_url + agency[0] + '/' + fwd_dt + '/download'
-                        urllib.request.urlretrieve(url, "../gtfs/feeds_" + input_date + 
-                                               "/" + agency[2] + '-' + input_date + ".zip")
-                        break
-                    else:
-                        print('Skipping due to error')
+            feeds = response.json()['results']['feeds']
+
+            for agencies in feeds:
+                ts = agencies['latest']['ts']
+                dt_str = str(datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d'))
+                name = agencies['t']
+                loc = agencies['l']['t']
+                dt_fetched = str(datetime.utcfromtimestamp(ts).strftime('%Y%m%d'))
+
+                for attempt in range(3):
+                    try:
+                        if attempt == 0:
+                            
+                            api_url = gtfs_url + agencies['id'] + '/' + dt_fetched + '/download'
+                            dir = "../gtfs/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
+                            urllib.request.urlretrieve(api_url, dir)
+                            break
+                        elif attempt == 1:
+                            bkwd_dt = str((datetime.strptime(dt_fetched, '%Y%m%d') + timedelta(days=1)).date().strftime('%Y%m%d'))   
+                            api_url = gtfs_url + agencies['id'] + '/' + bkwd_dt+ '/download'
+                            dir = "../gtfs/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
+                            urllib.request.urlretrieve(api_url, dir)
+                            dt_fetched = str((datetime.strptime(dt_fetched, '%Y%m%d') + timedelta(days=1)).date().strftime('%Y-%m-%d')) 
+                            
+                            break
+                        elif attempt == 2:
+                            fwd_dt = str((datetime.strptime(dt_fetched, '%Y%m%d') - timedelta(days=1)).date().strftime('%Y%m%d'))   
+                            api_url = gtfs_url + agencies['id'] + '/' + fwd_dt + '/download'
+                            dir = "../gtfs/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
+                            urllib.request.urlretrieve(api_url, dir)
+                            dt_fetched = str((datetime.strptime(dt_fetched, '%Y%m%d') - timedelta(days=1)).date().strftime('%Y-%m-%d'))   
+                            break
+                        else:
+                            print('Skipping due to error')
+                            break
+                    except:
+                        sleep(1)
+                        print('Attempt: ' + str(attempt))
+                        
+                            
+
+                try:          
+                    gtfs_file = GTFS.load_zip(dir)
+                    dt_st = str(gtfs_file.summary().first_date.date())
+                    dt_end = str(gtfs_file.summary().last_date.date())
+                    op_url = gtfs_file.agency['agency_url'][0]
                 except:
-                    pass
-        
-        #TODO reformat output csv
-        with open("../gtfs/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", "w") as csvfile:
-            writer = csv.writer(csvfile)
-            for row in id_lst:
-                writer.writerow(row)
+                    dt_st = None
+                    dt_end = None
+                    op_url = None
+
+                feed_info_lst.append(list([name, op_url, loc, agencies['id'], dt_str, dt_st, dt_end, api_url]))
+                    
+
+
+
+       
+                
+        feed_info = pd.DataFrame(feed_info_lst, columns = ['operator_name' , 'operator_url', 'operator_region', 'transit_feeds_id', 'date_fetched', 'earliest_calendar_date', 'latest_calendar_date', 'transitfeeds_url']) 
+        feed_info.to_csv("../gtfs/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", index = False)
+
+
     
