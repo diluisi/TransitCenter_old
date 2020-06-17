@@ -1,4 +1,5 @@
 
+<<<<<<< Updated upstream
 otp/.ipynb_checkpoints/top_code_test-checkpoint.ipynb
 otp/top_code_test.ipynb
 otp/__pycache__/otp.cpython-37.pyc
@@ -219,3 +220,30 @@ otp/otp_input/mbta/stops.txt
 otp/otp_input/mbta/trips.txt
 *.cfg
 gtfs/feeds_2020-06-15/Chicago_feed_info_2020-06-15.csv
+=======
+requirements.txt
+test.py
+*.zip
+spatial/.DS_Store
+utils/.DS_Store
+otp/otp_input/.DS_Store
+config.cfg
+gtfs/.ipynb_checkpoints/get_gtfs_test-checkpoint.ipynb
+gtfs/.ipynb_checkpoints/transit-feeds_test-checkpoint.ipynb
+gtfs/.ipynb_checkpoints/transit-land_test-checkpoint.ipynb
+otp/.DS_Store
+otp/.ipynb_checkpoints/top_code_test-checkpoint.ipynb
+otp/.ipynb_checkpoints/transit-feeds_test-checkpoint.ipynb
+otp/__pycache__/otp.cpython-37.pyc
+otp/graphs/graph-2020-02-29/Graph.obj
+otp/graphs/graph-2020-06-05/.DS_Store
+otp/otp-1.4.0-shaded.jar
+otp/otp_input/Boston.osm.pbf
+otp/otp_input/Graph.obj
+otp/top_code_test.ipynb
+utils/.ipynb_checkpoints/dc_debug-checkpoint.ipynb
+utils/.ipynb_checkpoints/test_utils-checkpoint.ipynb
+gtfs/.DS_Store
+utils/.ipynb_checkpoints/test_download_health-checkpoint.ipynb
+utils/test_download_health.ipynb
+>>>>>>> Stashed changes
