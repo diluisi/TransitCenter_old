@@ -247,3 +247,11 @@ gtfs/.DS_Store
 utils/.ipynb_checkpoints/test_download_health-checkpoint.ipynb
 utils/test_download_health.ipynb
 >>>>>>> Stashed changes
+*.geojson
+spatial/Strafford_all_block_group_pts.csv
+spatial/San Francisco-Oakland_all_block_group_pts.csv
+spatial/Philadelphia_all_block_group_pts.csv
+spatial/Los Angeles_all_block_group_pts.csv
+spatial/District of Columbia_all_block_group_pts.csv
+spatial/Chicago_all_block_group_pts.csv
+spatial/Boston_all_block_group_pts.csv

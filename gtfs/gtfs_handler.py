@@ -123,11 +123,12 @@ class get:
                 gtfs_zip = [row[0],row[7]]
                 if gtfs_zip not in gtfs_zips_to_dl:
                     gtfs_zips_to_dl.append(gtfs_zip)
-            
+        counter = 0    
         for gtfs_zip in gtfs_zips_to_dl:
             print(gtfs_zip)
             try:
-                urllib.request.urlretrieve(gtfs_zip[1], "../gtfs/feeds_" + input_date + "/" + input_date + "_" + gtfs_zip[0] + ".zip")
+                counter = counter + 1
+                urllib.request.urlretrieve(gtfs_zip[1], "../gtfs/feeds_" + input_date + "/" + input_date + "_" + gtfs_zip[0] + '_' + str(counter) + ".zip")
                 sleep(1)
             except:
                 None
