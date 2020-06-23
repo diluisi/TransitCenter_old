@@ -35,6 +35,13 @@ import gzip
 import shutil
 import os
 import json
+import requests
+import sys
+import overpy
+import shapely.geometry as geometry
+from shapely.ops import linemerge, unary_union, polygonize
+import geopandas as gpd
+import utils
 
 
 class get_destination_data:
@@ -138,7 +145,65 @@ class get_destination_data:
 
     def get_healthcare(self):
 
-        None
+        # set up path for where to download and store the data
+        file_path = self.region_folder_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["folder_name"]
+        output_file_path = file_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["contents"]["heathcare"]
+        block_group_poly_path = self.input_data_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["contents"]["block_group_polygons"]
+
+
+        # download the data
+
+        url_hospital = 'https://opendata.arcgis.com/datasets/6ac5e325468c4cb9b905f1728d6fbf0f_0.geojson'
+        urllib.request.urlretrieve(url_hospital, 'hospital.geojson')
+
+        url_urgent_care = 'https://opendata.arcgis.com/datasets/335ccc7c0684453fad69d8a64bc89192_0.geojson'
+        urllib.request.urlretrieve(url_urgent_care, 'urgent_care.geojson')
+
+        url_rx = 'https://rxopen.org/api/v1/map/download/facility'
+        urllib.request.urlretrieve(url_rx, 'pharmacy.csv')
+
+        # load the geom data
+
+        block_geom = gpd.read_file(block_group_poly_path)
+
+        hospital_geom = gpd.read_file('hospital.geojson')
+        urgent_care_geom = gpd.read_file('urgent_care.geojson')
+        rx = pd.read_csv('pharmacy.csv')
+
+        # count facilities
+        # hospital = hospital_geom.groupby(['GEOID']).count()[['FID']]
+        # urgent_care = urgent_care_geom.groupby(['GEOID']).count()[['FID']]
+        # rx_block = rx_geom.groupby(['GEOID']).count()[['Name']]
+
+        # converting lat lon to geom
+        rx = pd.read_csv('pharmacy.csv')
+        rx = pd.concat([rx, rx['CalcLocation'].str.split(',', expand=True)], axis=1)
+        rx['lon'] = rx[0].astype(float)
+        rx['lat'] = rx[1].astype(float)
+
+        rx_geom = gpd.GeoDataFrame(
+            rx, geometry=gpd.points_from_xy(rx['lat'], rx['lon']))
+
+        # count facilities
+        rx_geom = gpd.sjoin(rx_geom, block_geom, how="inner", op='intersects')
+    
+
+        # save file
+        # rx_block.to_csv(output_file_path)
+        # hospital.to_csv(output_file_path)
+        # urgent_care.to_csv(output_file_path)
+
+        healthcare = hospital_geom[['GEOID', 'ALAND']]
+        healthcare = healthcare.append(urgent_care_geom[['GEOID', 'ALAND']], ignore_index = True)
+        healthcare = healthcare.append(rx_geom[['GEOID', 'ALAND']], ignore_index = True)
+        
+        healthcare = healthcare.groupby(['GEOID']).count()[['ALAND']]
+
+        healthcare.columns = ['count']
+
+        healthcare.to_csv(output_file_path)
+
+
 
 
 
@@ -190,4 +255,102 @@ class get_destination_data:
 
     def get_parks(self):
 
-        None
+        overpass_url = "http://overpass-api.de/api/interpreter"
+        file_path = self.region_folder_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["folder_name"]
+        output_file_path = file_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["contents"]["greenspace"]
+        
+        block_group_poly_path = self.input_data_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["contents"]["block_group_polygons"]
+
+
+        region = self.region
+        extent = 'region'
+        county_ids = utils.county_ids.get_county_ids(region, extent)
+        xmin, xmax, ymin, ymax = utils.geometry.osm_bounds(region, county_ids, extent, file = False, raw = True)
+
+        bbox = (ymin, xmin, ymax, xmax)
+
+        api = overpy.Overpass()
+
+        query = """ 
+        [out:json];
+        (
+
+        way["leisure"="park"]{0};
+        way["leisure"="nature_reserve"]{0};
+        way["leisure"="playground"]{0};
+        way["leisure"="garden"]{0};
+        way["landuse"="grass"]{0};
+        way["leisure"="pitch"]{0};
+        way["leisure"="dogpark"]{0};
+        way["leisure"="common"]{0};
+        way["natural"="wood"]{0};
+        way["natural"="beach"]{0};
+        way["natural"="scrub"]{0};
+        way["natural"="fell"]{0};
+        way["natural"="heath"]{0};
+        way["natural"="moor"]{0};
+        way["natural"="grassland"]{0};
+        way["landuse"="recreation_ground"]{0};
+        way["landuse"="allotments"]{0};
+        way["landuse"="cemetery"]{0};
+        way["landuse"="meadow"]{0};
+        way["landuse"="orchard"]{0};
+        way["landuse"="greenfield"]{0};
+        way["landuse"="vineyard"]{0};
+        way["landuse"="village_green"]{0};
+        way["landuse"="forest"]{0};
+        
+        relation["leisure"="park"]{0};
+        relation["leisure"="nature_reserve"]{0};
+        relation["leisure"="playground"]{0};
+        relation["leisure"="garden"]{0};
+        relation["landuse"="grass"]{0};
+        relation["leisure"="pitch"]{0};
+        relation["leisure"="dogpark"]{0};
+        relation["leisure"="common"]{0};
+        relation["natural"="wood"]{0};
+        relation["natural"="beach"]{0};
+        relation["natural"="scrub"]{0};
+        relation["natural"="fell"]{0};
+        relation["natural"="heath"]{0};
+        relation["natural"="moor"]{0};
+        relation["natural"="grassland"]{0};
+        relation["landuse"="recreation_ground"]{0};
+        relation["landuse"="allotments"]{0};
+        relation["landuse"="cemetery"]{0};
+        relation["landuse"="meadow"]{0};
+        relation["landuse"="orchard"]{0};
+        relation["landuse"="greenfield"]{0};
+        relation["landuse"="vineyard"]{0};
+        relation["landuse"="village_green"]{0};
+        relation["landuse"="forest"]{0};
+        );
+        (._;>;);
+        out;
+        """.format(bbox)
+        response = api.query(query)
+
+        line = []
+
+        for way in response.ways:
+            coords = []
+            for node in way.nodes:
+                coords.append((node.lon, node.lat))
+                
+            line.append(geometry.LineString(coords))
+
+        merged = linemerge([*line]) 
+        borders = unary_union(merged) 
+        polygons = list(polygonize(borders))
+
+        parks = gpd.GeoDataFrame(geometry=gpd.GeoSeries(polygons))
+
+        bgpoly = gpd.read_file(block_group_poly_path)
+
+        parks_block =  gpd.overlay(parks, bgpoly, how='intersection')
+
+        parks_block.crs = {'init' :'epsg:4326'}
+        parks_block['area'] = parks_block.area*10000 # conversion to square kilometers
+        parks_block = parks_block.groupby(['GEOID']).sum()[['area']]
+
+        parks_block.to_csv(output_file_path, index = True)
