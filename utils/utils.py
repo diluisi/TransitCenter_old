@@ -12,7 +12,7 @@ import urllib
 from urllib.request import urlopen
 
 class county_ids:
-    def get_county_ids(region, extent, **kwargs):
+    def get_county_ids(region,  **kwargs):
         '''
         
         Reads the county ids csv and returns ids for inputted region.
@@ -21,8 +21,6 @@ class county_ids:
         ----------
         region : string
             name of region
-        extent : string 
-            options are 'core'-for counties containing the urban centres, 'msa - for counties in MSA, 'region' - for counties in TC region, 'all' for all counties
         names : boolean
             returns names of counties if specified
 
@@ -37,19 +35,9 @@ class county_ids:
         # reads file
         data = pd.read_csv('../utils/data/county_ids.csv', converters={'county_id': lambda x: str(x)})
         names = kwargs.get('names', False)
-        
-        
-        # filters the data based on extent
-        if extent == 'core':
-            df = data[(data['region_name'] == region) & (data['core'] == True)]
-        elif extent == 'msa':
-            df = data[(data['region_name'] == region) & (data['msa'] == True)]
-        elif extent == 'region':
-            df = data[(data['region_name'] == region) & (data['region'] == True)]
-        elif extent == 'all':
-            df = data[(data['region_name'] == region)]
-        else:
-            return 'Not Valid Extent'
+
+        df = data[(data['region_name'] == region)]
+
         
         if names == True:
             temp = df[['county_id', 'county_name']]
@@ -62,7 +50,7 @@ class county_ids:
     
 
 class geometry:
-    def boundaries(region, county_ids, extent, **kwargs):
+    def boundaries(region, county_ids, **kwargs):
         '''
         
 
@@ -72,9 +60,6 @@ class geometry:
             region name
         county_ids : string
             list of county ids
-        extent : string
-            extent type
-            options are 'core', 'msa', 'region', or all
         in_memory : boolean
             True if the output should be returned instead of being written as a file
 
@@ -107,11 +92,11 @@ class geometry:
         if in_memory == True:
             return gdf_region
         else:
-            gdf_region.to_file("../spatial/" + region + '_' + extent + "_boundary.geojson", driver='GeoJSON')
+            gdf_region.to_file("../spatial/" + region + '_' + "_boundary.geojson", driver='GeoJSON')
         
         
         
-    def block_groups(region, county_ids, extent):
+    def block_groups(region, county_ids):
         '''
         
 
@@ -121,9 +106,6 @@ class geometry:
             region name
         county_ids : string
             list of county ids
-        extent : string
-            extent type
-            options are 'core', 'msa', 'region', or all
 
         Returns
         -------
@@ -170,13 +152,13 @@ class geometry:
         # remove the block groups with an ID of 0, these pertain to those in non-tracted area (usually a waterbody)
         gdf_block_groups_poly = gdf_block_groups_poly[gdf_block_groups_poly["BLKGRPCE"] != "0"]
         
-        pd_block_groups.to_csv("../spatial/" + region + '_' + extent + "_block_group_pts.csv")
+        pd_block_groups.to_csv("../spatial/" + region + '_' + "_block_group_pts.csv")
         
-        gdf_block_groups_poly.to_file("../spatial/" + region + '_' + extent +  "_block_group_poly.geojson", driver='GeoJSON')
+        gdf_block_groups_poly.to_file("../spatial/" + region + '_' +  "_block_group_poly.geojson", driver='GeoJSON')
     
         
         
-    def osm_bounds(region, county_ids, extent, **kwargs):
+    def osm_bounds(region, county_ids, **kwargs):
         '''
         
 
@@ -186,9 +168,6 @@ class geometry:
             region name
         county_ids : string
             list of county ids
-        extent : string
-            extent type
-            options are 'core', 'msa', 'region', or 'all'
         file : boolean
             False to call the boundaries function instead of reading the file from the disk.
         raw : boolean
@@ -207,9 +186,9 @@ class geometry:
         raw = kwargs.get('raw', False)
         
         if file == True:
-            gdf_boundary = gpd.read_file("../spatial/" + region + '_' + extent +  "_boundary.geojson")
+            gdf_boundary = gpd.read_file("../spatial/" + region + '_' +  "_boundary.geojson")
         else:
-            gdf_boundary = geometry.boundaries(region, county_ids, extent, in_memory = True)
+            gdf_boundary = geometry.boundaries(region, county_ids, in_memory = True)
         
         # adds buffer to the bounds
         xmin = float(gdf_boundary.bounds.minx) - 0.05
