@@ -171,9 +171,11 @@ class get_destination_data:
         rx = pd.read_csv('pharmacy.csv')
 
         # count facilities
-        # hospital = hospital_geom.groupby(['GEOID']).count()[['FID']]
-        # urgent_care = urgent_care_geom.groupby(['GEOID']).count()[['FID']]
-        # rx_block = rx_geom.groupby(['GEOID']).count()[['Name']]
+        hospital = hospital_geom.groupby(['GEOID']).count()[['FID']]
+        hospital.columns = ['hospitals']
+        urgent_care = urgent_care_geom.groupby(['GEOID']).count()[['FID']]
+        urgent_care.columns = ['urgent_care_facilities']
+
 
         # converting lat lon to geom
         rx = pd.read_csv('pharmacy.csv')
@@ -186,20 +188,13 @@ class get_destination_data:
 
         # count facilities
         rx_geom = gpd.sjoin(rx_geom, block_geom, how="inner", op='intersects')
+        rx_block = rx_geom.groupby(['GEOID']).count()[['Name']]
+        rx_block.columns = ['pharmacies']
     
 
-        # save file
-        # rx_block.to_csv(output_file_path)
-        # hospital.to_csv(output_file_path)
-        # urgent_care.to_csv(output_file_path)
-
-        healthcare = hospital_geom[['GEOID', 'ALAND']]
-        healthcare = healthcare.append(urgent_care_geom[['GEOID', 'ALAND']], ignore_index = True)
-        healthcare = healthcare.append(rx_geom[['GEOID', 'ALAND']], ignore_index = True)
-        
-        healthcare = healthcare.groupby(['GEOID']).count()[['ALAND']]
-
-        healthcare.columns = ['count']
+        healthcare = hospital.join(rx_block, how = 'outer')
+        healthcare = healthcare.join(urgent_care, how = 'outer')
+        healthcare = healthcare.fillna(0)
 
         healthcare.to_csv(output_file_path)
 
