@@ -20,6 +20,7 @@ from datetime import timedelta
 import geopandas 
 import configparser
 from gtfslite import GTFS
+import shutil
 
 class get:
 
@@ -214,26 +215,44 @@ class get:
                             break
                     except:
                         sleep(1)
-                        print('Attempt: ' + str(attempt))
-                        
-                            
+                dir_name = "../gtfs/feeds_" + input_date + "/" + name + '-' + input_date 
+                try:
+                    shutil.unpack_archive(dir_name + '.zip', dir_name)
 
-                try:          
-                    gtfs_file = GTFS.load_zip(dir)
-                    dt_st = str(gtfs_file.summary().first_date.date())
-                    dt_end = str(gtfs_file.summary().last_date.date())
-                    op_url = gtfs_file.agency['agency_url'][0]
+                    stops = pd.read_csv(dir_name + '/stops.txt')
+                    try:
+                        os.remove(dir_name + '/pathways.txt')
+                    except:
+                        pass
+                    try:          
+                        gtfs_file = GTFS.load_zip(dir)
+                        dt_st = str(gtfs_file.summary().first_date.date())
+                        dt_end = str(gtfs_file.summary().last_date.date())
+                        op_url = gtfs_file.agency['agency_url'][0]
+                    except:
+                        dt_st = None
+                        dt_end = None
+                        op_url = None
+
+                    for index, row in stops.iterrows():
+                        if(pd.isnull(row['stop_lat'])):
+                            stops.at[index, 'stop_lat'] = 0
+                            stops.at[index, 'stop_lon'] = 0
+
+
+                    stops.to_csv(dir_name+'/stops.txt', index = False)
+
+                    shutil.make_archive(dir_name, 'zip', dir_name)
+
+                    shutil.rmtree(dir_name)
                 except:
                     dt_st = None
                     dt_end = None
                     op_url = None
 
                 feed_info_lst.append(list([name, op_url, loc, agencies['id'], dt_str, dt_st, dt_end, api_url]))
-                    
 
-
-
-       
+                
                 
         feed_info = pd.DataFrame(feed_info_lst, columns = ['operator_name' , 'operator_url', 'operator_region', 'transit_feeds_id', 'date_fetched', 'earliest_calendar_date', 'latest_calendar_date', 'transitfeeds_url']) 
         feed_info.to_csv("../gtfs/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", index = False)
