@@ -10,8 +10,18 @@ import geopandas as gpd
 import pandas as pd
 import urllib
 from urllib.request import urlopen
+<<<<<<< Updated upstream
 
 class county_ids:
+=======
+import configparser
+
+config = configparser.ConfigParser()
+config.read('../config.cfg')
+class county_ids:
+
+
+>>>>>>> Stashed changes
     def get_county_ids(region,  **kwargs):
         '''
         
@@ -31,9 +41,16 @@ class county_ids:
             If names is specified, format will be a nested list.
 
         '''
+<<<<<<< Updated upstream
         
         # reads file
         data = pd.read_csv('../utils/data/county_ids.csv', converters={'county_id': lambda x: str(x)})
+=======
+
+        
+        # reads file
+        data = pd.read_csv(config['General']['county_ids'], converters={'county_id': lambda x: str(x)})
+>>>>>>> Stashed changes
         names = kwargs.get('names', False)
 
         df = data[(data['region_name'] == region)]
@@ -76,7 +93,11 @@ class geometry:
         gurl = "https://gist.githubusercontent.com/jamaps/6d94faec77dde5df0f4cdf8d5018ca9d/raw/7d65b613cee762f7224baf60db33b00e903aee1c/US_counties_wgs84.geojson"
         gdf_counties = gpd.read_file(urlopen(gurl))
         gdf_counties = gdf_counties[gdf_counties.GEOID.isin(county_ids)]
+<<<<<<< Updated upstream
         gdf_counties.to_file("../spatial/" + region + "_counties.geojson", driver='GeoJSON')
+=======
+        gdf_counties.to_file(config[region]['county_boundaries'], driver='GeoJSON')
+>>>>>>> Stashed changes
     
         # define the region boundaries
         gdf_region = gdf_counties.dissolve(by="LSAD")
@@ -87,12 +108,20 @@ class geometry:
         gdf_region = gdf_region.dissolve(by= 'name', aggfunc='sum')
         
         
+<<<<<<< Updated upstream
         gdf_region.to_file("../spatial/" + region + "_boundary.geojson", driver='GeoJSON')
+=======
+    
+>>>>>>> Stashed changes
         
         if in_memory == True:
             return gdf_region
         else:
+<<<<<<< Updated upstream
             gdf_region.to_file("../spatial/" + region + '_' + "_boundary.geojson", driver='GeoJSON')
+=======
+            gdf_region.to_file(config[region]['region_boundary'], driver='GeoJSON')
+>>>>>>> Stashed changes
         
         
         
@@ -152,9 +181,15 @@ class geometry:
         # remove the block groups with an ID of 0, these pertain to those in non-tracted area (usually a waterbody)
         gdf_block_groups_poly = gdf_block_groups_poly[gdf_block_groups_poly["BLKGRPCE"] != "0"]
         
+<<<<<<< Updated upstream
         pd_block_groups.to_csv("../spatial/" + region + '_' + "_block_group_pts.csv")
         
         gdf_block_groups_poly.to_file("../spatial/" + region + '_' +  "_block_group_poly.geojson", driver='GeoJSON')
+=======
+        pd_block_groups.to_csv(config[region]['block_group_points'])
+        
+        gdf_block_groups_poly.to_file(config[region]['block_group_polygons'], driver='GeoJSON')
+>>>>>>> Stashed changes
     
         
         
@@ -186,7 +221,11 @@ class geometry:
         raw = kwargs.get('raw', False)
         
         if file == True:
+<<<<<<< Updated upstream
             gdf_boundary = gpd.read_file("../spatial/" + region + '_' +  "_boundary.geojson")
+=======
+            gdf_boundary = gpd.read_file(config[region]['region_boundary'])
+>>>>>>> Stashed changes
         else:
             gdf_boundary = geometry.boundaries(region, county_ids, in_memory = True)
         
