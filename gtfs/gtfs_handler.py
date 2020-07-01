@@ -22,17 +22,10 @@ import configparser
 from gtfslite import GTFS
 import shutil
 
-<<<<<<< Updated upstream
-class get:
-
-    config = configparser.ConfigParser()
-    config.read('../config.cfg')
-=======
 config = configparser.ConfigParser()
 config.read('../config.cfg')
 
 class get:
->>>>>>> Stashed changes
 
     def transit_land(region, county_ids, input_date, xmin, xmax, ymin, ymax):
         
@@ -120,19 +113,11 @@ class get:
                 None
         
         # make sub directory for the GTFS
-<<<<<<< Updated upstream
-        os.makedirs("../gtfs/feeds_" + input_date, exist_ok=True)
-        
-        # write this info to a csv file, downloading the GTFS at the same time
-        gtfs_zips_to_dl = []
-        with open("../gtfs/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", "w") as csvfile:
-=======
         os.makedirs(config[region]['gtfs_static'] + "/feeds_" + input_date, exist_ok=True)
         
         # write this info to a csv file, downloading the GTFS at the same time
         gtfs_zips_to_dl = []
         with open(config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", "w") as csvfile:
->>>>>>> Stashed changes
             writer = csv.writer(csvfile)
             for row in output_feed_info:
                 writer.writerow(row)
@@ -144,22 +129,14 @@ class get:
             print(gtfs_zip)
             try:
                 counter = counter + 1
-<<<<<<< Updated upstream
-                urllib.request.urlretrieve(gtfs_zip[1], "../gtfs/feeds_" + input_date + "/" + input_date + "_" + gtfs_zip[0] + '_' + str(counter) + ".zip")
-=======
                 urllib.request.urlretrieve(gtfs_zip[1], config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + input_date + "_" + gtfs_zip[0] + '_' + str(counter) + ".zip")
->>>>>>> Stashed changes
                 sleep(1)
             except:
                 None
                 
     def transit_feeds(region, county_ids, input_date, xmin, xmax, ymin, ymax):
         
-<<<<<<< Updated upstream
-        key = get.config['GTFS']['key']
-=======
         key = config['API']['key']
->>>>>>> Stashed changes
         coords = [(xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin)]
         poly = Polygon(coords)
         
@@ -186,11 +163,7 @@ class get:
             if pt.within(poly) is True: 
                 location_ids.append(operator['id'])
         
-<<<<<<< Updated upstream
-        os.makedirs("../gtfs/feeds_" + input_date, exist_ok=True)
-=======
         os.makedirs(config[region]['gtfs_static'] + "/feeds_" + input_date, exist_ok=True)
->>>>>>> Stashed changes
         
         # loops through all locations
         feed_info_lst = []
@@ -219,21 +192,13 @@ class get:
                         if attempt == 0:
                             
                             api_url = gtfs_url + agencies['id'] + '/' + dt_fetched + '/download'
-<<<<<<< Updated upstream
-                            dir = "../gtfs/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
-=======
                             dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
->>>>>>> Stashed changes
                             urllib.request.urlretrieve(api_url, dir)
                             break
                         elif attempt == 1:
                             bkwd_dt = str((datetime.strptime(dt_fetched, '%Y%m%d') + timedelta(days=1)).date().strftime('%Y%m%d'))   
                             api_url = gtfs_url + agencies['id'] + '/' + bkwd_dt+ '/download'
-<<<<<<< Updated upstream
-                            dir = "../gtfs/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
-=======
                             dir = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
->>>>>>> Stashed changes
                             urllib.request.urlretrieve(api_url, dir)
                             dt_fetched = str((datetime.strptime(dt_fetched, '%Y%m%d') + timedelta(days=1)).date().strftime('%Y-%m-%d')) 
                             
@@ -241,11 +206,7 @@ class get:
                         elif attempt == 2:
                             fwd_dt = str((datetime.strptime(dt_fetched, '%Y%m%d') - timedelta(days=1)).date().strftime('%Y%m%d'))   
                             api_url = gtfs_url + agencies['id'] + '/' + fwd_dt + '/download'
-<<<<<<< Updated upstream
-                            dir = "../gtfs/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
-=======
                             dir = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
->>>>>>> Stashed changes
                             urllib.request.urlretrieve(api_url, dir)
                             dt_fetched = str((datetime.strptime(dt_fetched, '%Y%m%d') - timedelta(days=1)).date().strftime('%Y-%m-%d'))   
                             break
@@ -254,11 +215,7 @@ class get:
                             break
                     except:
                         sleep(1)
-<<<<<<< Updated upstream
-                dir_name = "../gtfs/feeds_" + input_date + "/" + name + '-' + input_date 
-=======
                 dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
->>>>>>> Stashed changes
                 try:
                     shutil.unpack_archive(dir_name + '.zip', dir_name)
 
@@ -292,21 +249,14 @@ class get:
                     dt_st = None
                     dt_end = None
                     op_url = None
-<<<<<<< Updated upstream
-=======
                     shutil.rmtree(dir_name)
->>>>>>> Stashed changes
 
                 feed_info_lst.append(list([name, op_url, loc, agencies['id'], dt_str, dt_st, dt_end, api_url]))
 
                 
                 
         feed_info = pd.DataFrame(feed_info_lst, columns = ['operator_name' , 'operator_url', 'operator_region', 'transit_feeds_id', 'date_fetched', 'earliest_calendar_date', 'latest_calendar_date', 'transitfeeds_url']) 
-<<<<<<< Updated upstream
-        feed_info.to_csv("../gtfs/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", index = False)
-=======
         feed_info.to_csv(config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", index = False)
->>>>>>> Stashed changes
 
 
     
