@@ -95,13 +95,14 @@ class FileConfig():
 
         config['General'] = {}
         config['General']['county_ids'] = '../data/General/county_ids.csv' 
+        config['General']['us_osm'] = '../data/General/us-latest.osm.pbf' 
         # Paths
         for REGION in region_list:
             # Boston region config
             config[REGION] = {}   
             # Boundary data
             config[REGION]['block_group_polygons'] = '../data/' + REGION + '/input/boundary_data/block_group_poly.geojson'
-            config[REGION]['block_group_points'] = '../data/' + REGION + '/input/boundary_data/block_group_pts.geojson'
+            config[REGION]['block_group_points'] = '../data/' + REGION + '/input/boundary_data/block_group_pts.csv'
             config[REGION]['county_boundaries'] = '../data/' + REGION + '/input/boundary_data/country_boundaries.geojson'
             config[REGION]['region_boundary'] = '../data/' + REGION + '/input/boundary_data/region_boundary.geojson'   
             # Open Street Map
