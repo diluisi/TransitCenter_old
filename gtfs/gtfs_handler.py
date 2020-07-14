@@ -129,7 +129,37 @@ class get:
             print(gtfs_zip)
             try:
                 counter = counter + 1
-                urllib.request.urlretrieve(gtfs_zip[1], config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + input_date + "_" + gtfs_zip[0] + '_' + str(counter) + ".zip")
+                urllib.request.urlretrieve(gtfs_zip[1], config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + gtfs_zip[0] +  '-' + input_date + '_'+str(counter) + ".zip")
+                name = gtfs_zip[0]
+                dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date +'-'+ str(counter)
+                try:
+                    shutil.unpack_archive(dir_name + '.zip', dir_name)
+
+                    stops = pd.read_csv(dir_name + '/stops.txt')
+                    try:
+                        os.remove(dir_name + '/pathways.txt')
+                    except:
+                        pass
+
+
+                    for index, row in stops.iterrows():
+                        if(pd.isnull(row['stop_lat'])):
+                            stops.at[index, 'stop_lat'] = 0
+                            stops.at[index, 'stop_lon'] = 0
+
+
+                    stops.to_csv(dir_name+'/stops.txt', index = False)
+
+                    shutil.make_archive(dir_name, 'zip', dir_name)
+
+                    shutil.rmtree(dir_name)
+                except:
+
+                    shutil.rmtree(dir_name)
+                
+                
+                
+                
                 sleep(1)
             except:
                 None
@@ -187,6 +217,7 @@ class get:
                 loc = agencies['l']['t']
                 dt_fetched = str(datetime.utcfromtimestamp(ts).strftime('%Y%m%d'))
 
+                
                 for attempt in range(3):
                     try:
                         if attempt == 0:
@@ -252,11 +283,198 @@ class get:
                     shutil.rmtree(dir_name)
 
                 feed_info_lst.append(list([name, op_url, loc, agencies['id'], dt_str, dt_st, dt_end, api_url]))
+        
+        if region == 'District of Columbia':
+            ts = agencies['latest']['ts']
+            dt_str = str(datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d'))
+            name = 'Virginia Rail Express'
+            loc = 'Virginia'
+            dt_fetched = str(datetime.utcfromtimestamp(ts).strftime('%Y%m%d'))
+            vre_url =  'https://transitfeeds.com/p/virginia-railway-express/250/latest/download'
 
+                        
+            api_url = vre_url 
+            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+            urllib.request.urlretrieve(api_url, dir)
+                   
+
+
+
+            try:          
+                gtfs_file = GTFS.load_zip(dir)
+                dt_st = str(gtfs_file.summary().first_date.date())
+                dt_end = str(gtfs_file.summary().last_date.date())
+                op_url = gtfs_file.agency['agency_url'][0]
+            except:
+                dt_st = None
+                dt_end = None
+                op_url = None
+
+
+
+            feed_info_lst.append(list([name, op_url, loc, 'virginia-railway-express/250', dt_str, dt_st, dt_end, api_url]))
                 
                 
         feed_info = pd.DataFrame(feed_info_lst, columns = ['operator_name' , 'operator_url', 'operator_region', 'transit_feeds_id', 'date_fetched', 'earliest_calendar_date', 'latest_calendar_date', 'transitfeeds_url']) 
         feed_info.to_csv(config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", index = False)
 
+    
+    def transit_feeds_historical(region, county_ids, input_date, xmin, xmax, ymin, ymax):
+        
+        key = config['API']['key']
+        coords = [(xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin)]
+        poly = Polygon(coords)
+        
+        s = requests.Session()
+        
+        url = 'https://api.transitfeeds.com'
+        gtfs_url = 'https://transitfeeds.com/p/'
+        
+        response = s.get(
+            url+'/v1/getLocations',
+            params = {'key': key
+               
+            }
+        )
 
+
+        locations = response.json()['results']['locations']
+        sleep(15)
+        # filters locations to only those within bounding box
+
+        location_ids = []
+        for operator in locations:
+            pt = Point(operator['lng'], operator['lat'])
+            if pt.within(poly) is True: 
+                location_ids.append(operator['id'])
+        
+        os.makedirs(config[region]['gtfs_static'] + "/feeds_" + input_date, exist_ok=True)
+        
+        # loops through all locations
+        feed_info_lst = []
+        
+        for ids in location_ids:
+
+                
+            response = s.get(
+                url+'/v1/getFeeds',
+                params = {'key': key, 'location' : ids, 'type': 'gtfs', 'limit': 200
+
+                }
+            )
+            
+            feeds = response.json()['results']['feeds']
+
+            for agencies in feeds:
+
+
+                name = agencies['t']
+                loc = agencies['l']['t']                
+                dt_time = datetime.strptime(input_date, '%Y-%m-%d')
+                
+                for j in range(365):
+                    dt_fetched = str(dt_time.strftime('%Y%m%d'))
+                    dt_str = str(dt_time.strftime('%Y-%m-%d'))
+                    api_url = gtfs_url + agencies['id'] + '/' + dt_fetched + '/download'
+                    request = requests.get(api_url)
+                    if request.status_code == 200:
+                        update = True
+                        break
+                    else:
+                        dt_time = dt_time - timedelta(days = 1)
+                        
+                    if j == 364:
+                        update = False
+                        print('No updated feed for:' + str(name))
+                
+                                     
+                
+                if update == True:
+                    api_url = gtfs_url + agencies['id'] + '/' + dt_fetched + '/download'
+                    dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+                    urllib.request.urlretrieve(api_url, dir)
+    
+    
+                    dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
+                    try:
+                        shutil.unpack_archive(dir_name + '.zip', dir_name)
+    
+                        stops = pd.read_csv(dir_name + '/stops.txt')
+                        try:
+                            os.remove(dir_name + '/pathways.txt')
+                        except:
+                            pass
+                        try:          
+                            gtfs_file = GTFS.load_zip(dir)
+                            dt_st = str(gtfs_file.summary().first_date.date())
+                            dt_end = str(gtfs_file.summary().last_date.date())
+                            op_url = gtfs_file.agency['agency_url'][0]
+                        except:
+                            dt_st = None
+                            dt_end = None
+                            op_url = None
+    
+                        for index, row in stops.iterrows():
+                            if(pd.isnull(row['stop_lat'])):
+                                stops.at[index, 'stop_lat'] = 0
+                                stops.at[index, 'stop_lon'] = 0
+    
+    
+                        stops.to_csv(dir_name+'/stops.txt', index = False)
+    
+                        shutil.make_archive(dir_name, 'zip', dir_name)
+    
+                        shutil.rmtree(dir_name)
+                    except:
+                        dt_st = None
+                        dt_end = None
+                        op_url = None
+                        shutil.rmtree(dir_name)
+    
+                    feed_info_lst.append(list([name, op_url, loc, agencies['id'], dt_str, dt_st, dt_end, api_url]))
+                else:
+                    continue
+        
+        if region == 'District of Columbia':
+
+
+            name = 'Virginia Rail Express'
+            loc = 'Virginia'
+
+            vre_url =  'https://transitfeeds.com/p/virginia-railway-express/250/'
+            
+            while True:
+                dt_fetched = str(dt_time.strftime('%Y%m%d'))
+                dt_str = dt_fetched
+                api_url = vre_url + '/' + dt_fetched + '/download'
+                request = requests.get(api_url)
+                if request.status_code == 200:
+                    break
+                else:
+                    dt_time - dt_time - timedelta(days = 1)
+                        
+
+            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+            urllib.request.urlretrieve(api_url, dir)
+                   
+
+
+
+            try:          
+                gtfs_file = GTFS.load_zip(dir)
+                dt_st = str(gtfs_file.summary().first_date.date())
+                dt_end = str(gtfs_file.summary().last_date.date())
+                op_url = gtfs_file.agency['agency_url'][0]
+            except:
+                dt_st = None
+                dt_end = None
+                op_url = None
+
+
+
+            feed_info_lst.append(list([name, op_url, loc, 'virginia-railway-express/250', dt_str, dt_st, dt_end, api_url]))
+                
+                
+        feed_info = pd.DataFrame(feed_info_lst, columns = ['operator_name' , 'operator_url', 'operator_region', 'transit_feeds_id', 'date_fetched', 'earliest_calendar_date', 'latest_calendar_date', 'transitfeeds_url']) 
+        feed_info.to_csv(config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", index = False)
     
