@@ -9,3 +9,9 @@ test.py
 otp/.DS_Store
 gtfs/.DS_Store
 *.pyc
+
+env
+.gitignore
+.vscode
+results.db
+*.zip
