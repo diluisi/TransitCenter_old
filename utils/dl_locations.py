@@ -51,7 +51,7 @@ class get_destination_data:
         self.region = region
 
         # load in file paths
-        with open('utils/data_folder.cfg', 'r') as d:
+        with open('data_folder.cfg', 'r') as d:
             d = d.read()
         self.data_paths = json.loads(d)
 
@@ -147,28 +147,32 @@ class get_destination_data:
 
         # set up path for where to download and store the data
         file_path = self.region_folder_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["folder_name"]
-        output_file_path = file_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["contents"]["heathcare"]
+        output_file_path = file_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["contents"]["healthcare"]
         block_group_poly_path = self.input_data_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["contents"]["block_group_polygons"]
 
 
         # download the data
 
         url_hospital = 'https://opendata.arcgis.com/datasets/6ac5e325468c4cb9b905f1728d6fbf0f_0.geojson'
-        urllib.request.urlretrieve(url_hospital, 'hospital.geojson')
+        urllib.request.urlretrieve(url_hospital, '../data/General/hospital.geojson')
 
         url_urgent_care = 'https://opendata.arcgis.com/datasets/335ccc7c0684453fad69d8a64bc89192_0.geojson'
-        urllib.request.urlretrieve(url_urgent_care, 'urgent_care.geojson')
+        urllib.request.urlretrieve(url_urgent_care, '../data/General/urgent_care.geojson')
 
         url_rx = 'https://rxopen.org/api/v1/map/download/facility'
-        urllib.request.urlretrieve(url_rx, 'pharmacy.csv')
+        urllib.request.urlretrieve(url_rx, '../data/General/pharmacy.csv')
 
         # load the geom data
 
         block_geom = gpd.read_file(block_group_poly_path)
 
-        hospital_geom = gpd.read_file('hospital.geojson')
-        urgent_care_geom = gpd.read_file('urgent_care.geojson')
-        rx = pd.read_csv('pharmacy.csv')
+        hospital_geom = gpd.read_file('../data/General/hospital.geojson')
+        urgent_care_geom = gpd.read_file('../data/General/urgent_care.geojson')
+        rx = pd.read_csv('../data/General/pharmacy.csv')
+
+
+        hospital_geom = gpd.sjoin(hospital_geom, block_geom, how="inner", op='intersects')
+        urgent_care_geom = gpd.sjoin(urgent_care_geom, block_geom, how="inner", op='intersects')
 
         # count facilities
         hospital = hospital_geom.groupby(['GEOID']).count()[['FID']]
@@ -197,8 +201,43 @@ class get_destination_data:
         healthcare = healthcare.fillna(0)
 
         healthcare.to_csv(output_file_path)
+    
+    def get_education(self):
+        # set up path for where to download and store the data
+        file_path = self.region_folder_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["folder_name"]
+        output_file_path = file_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["contents"]["education"]
+        block_group_poly_path = self.input_data_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["contents"]["block_group_polygons"]
+
+        url_university = 'https://opendata.arcgis.com/datasets/0d7bedf9d582472e9ff7a6874589b545_0.geojson'
+        urllib.request.urlretrieve(url_university, '../data/General/university.geojson')
+
+        url_supp_college = 'https://opendata.arcgis.com/datasets/284d5c00b0d046e18eddff4017927dd1_0.geojson'
+        urllib.request.urlretrieve(url_supp_college, '../data/General/supp_college.geojson')
+
+        # load the geom data
+
+        block_geom = gpd.read_file(block_group_poly_path)
 
 
+        university_geom = gpd.read_file('../data/General/university.geojson')
+        supp_college_geom = gpd.read_file('../data/General/supp_college.geojson')
+
+        university_geom = gpd.sjoin(university_geom, block_geom, how="inner", op='intersects')
+        supp_college_geom = gpd.sjoin(supp_college_geom, block_geom, how="inner", op='intersects')
+
+        # count facilities
+        university = university_geom.groupby(['GEOID']).count()[['OBJECTID']]
+        university.columns = ['university']
+        supp_college = supp_college_geom.groupby(['GEOID']).count()[['FID']]
+        supp_college.columns = ['supp_college']
+
+
+        edu_temp = university.join(supp_college, how = 'outer')
+        edu_temp = edu_temp.fillna(0)
+        edu_temp['count'] = edu_temp['university'] + edu_temp['supp_college']
+        education = edu_temp['count']
+
+        education.to_csv(output_file_path)
 
 
 
@@ -250,7 +289,6 @@ class get_destination_data:
 
     def get_parks(self):
 
-        overpass_url = "http://overpass-api.de/api/interpreter"
         file_path = self.region_folder_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["folder_name"]
         output_file_path = file_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["contents"]["greenspace"]
         
@@ -258,9 +296,8 @@ class get_destination_data:
 
 
         region = self.region
-        extent = 'region'
-        county_ids = utils.county_ids.get_county_ids(region, extent)
-        xmin, xmax, ymin, ymax = utils.geometry.osm_bounds(region, county_ids, extent, file = False, raw = True)
+        county_ids = utils.county_ids.get_county_ids(region)
+        xmin, xmax, ymin, ymax = utils.geometry.osm_bounds(region, county_ids, file = False, raw = True)
 
         bbox = (ymin, xmin, ymax, xmax)
 
@@ -345,7 +382,8 @@ class get_destination_data:
         parks_block =  gpd.overlay(parks, bgpoly, how='intersection')
 
         parks_block.crs = {'init' :'epsg:4326'}
-        parks_block['area'] = parks_block.area*10000 # conversion to square kilometers
+        parks_block = parks_block.to_crs({'init': 'epsg:3857'})
+        parks_block['area'] = parks_block.area/ 10**6 # conversion to square kilometers
         parks_block = parks_block.groupby(['GEOID']).sum()[['area']]
 
         parks_block.to_csv(output_file_path, index = True)
