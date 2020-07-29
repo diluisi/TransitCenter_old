@@ -4,8 +4,10 @@ import lehd
 
 def dl(region):
     """
-    Downloads data from the ACS and LEHD from
+    Downloads data from the ACS from
     https://www.census.gov/data/developers/data-sets/acs-5year.html
+    and LEHD data from
+    https://lehd.ces.census.gov/data/
     """
 
     county_id_path = "data/nationwide_data/county_ids.csv"
@@ -14,6 +16,7 @@ def dl(region):
 
     out_data_path = "data/" + region + "/input/population_data/demographics.csv"
 
+    # variables to download from the ACS
     variables = [
     'B03002_001E', # total population
     'B03002_003E', # non-hispanic white
