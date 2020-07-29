@@ -65,9 +65,10 @@ def dl(region):
     df["hhld_total"] = df["B11001_001E"].astype(int) # total households
     df["hhld_total_w_chld"] = df['B11005_002E'].astype(int) # total households with children (<18 years old)
     df["hhld_single_mother"] = df['B11005_007E'].astype(int) # total single mother households (<18 years old)
+    df.drop(variables, inplace=True, axis=1) # dropping unneeded variables
 
-    df.drop(variables, inplace=True, axis=1)
 
+    # bringing in shares for essential worker by LEHD NAICS category
     ess = pd.read_csv(esential_worker_path)
     ess = ess[ess["name"] == region]
 
@@ -80,6 +81,7 @@ def dl(region):
 
     dfl["workers_all"] = dfl["C000"]
 
+    # computing total essential workers
     dfl["workers_essential"] = 0
     for index, row in ess.iterrows():
         LEHDcat = row['LEHD']
@@ -88,10 +90,7 @@ def dl(region):
 
     dfl = dfl[["h_geoid_BG","workers_all","workers_essential"]]
 
-
-
+    # merge and save the output
     df = pd.merge(df,dfl,left_on ="geoid", right_on ="h_geoid_BG", how = "outer")
-
     del df["h_geoid_BG"]
-
     df.to_csv(out_data_path, index = False)
