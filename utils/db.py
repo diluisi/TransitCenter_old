@@ -20,6 +20,26 @@ class BaseModel(Model):
 class BlockGroup(BaseModel):
     id = IntegerField(primary_key=True)
 
+    @staticmethod
+    def by_tag(tag):
+        return (BlockGroup.select(BlockGroup.id)
+                    .join(BlockGroupTag).join(Tag)
+                    .where(Tag.name == tag))
+
+    @staticmethod
+    def tag_bg_from_csv(filepath, tag):
+        df = pd.read_csv(filepath, dtype={'block_group_id': 'Int64'})
+        t, new = Tag.get_or_create(name=tag)
+        to_insert = []
+        for idx, bg in df.iterrows():
+            to_tag = dict()
+            to_tag['block_group_id'] = bg.block_group_id
+            to_tag['tag_id'] = t.id
+            to_insert.append(to_tag)
+
+        with database.atomic():
+            for batch in chunked(to_insert, 100):
+                BlockGroupTag.insert_many(batch).execute()
 
 class ScoreType(BaseModel):
     name = TextField()
