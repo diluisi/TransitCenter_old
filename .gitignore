@@ -8,6 +8,7 @@ test.py
 *.jar
 otp/.DS_Store
 gtfs/.DS_Store
+utils/.DS_Store
 *.pyc
 
 env

@@ -1,4 +1,5 @@
 import pandas as pd
+import geopandas as gpd
 import cenpy
 import lehd
 
@@ -97,3 +98,12 @@ def dl(region):
     df = pd.merge(df,dfl,left_on ="geoid", right_on ="h_geoid_BG", how = "outer")
     del df["h_geoid_BG"]
     df.to_csv(out_data_path, index = False)
+
+
+def dots(region):
+
+    demo_data_path = "data/" + region + "/input/population_data/"
+
+    demo_file_name = "demographics"
+
+    dots_file_name = "demo_dots.csv"
