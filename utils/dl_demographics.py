@@ -1,4 +1,20 @@
+'''
+Functions for 1) downloading demographic data into a csv file
+and 2) generate a dot density layer for this demographic data
+
+run via...
+
+from utils import dl_demographics
+dl_demographics.dl("Boston")
+dl_demographics.dots("Boston")
+
+'''
+
 import pandas as pd
+import geopandas as gpd
+import shapely
+import random
+import csv
 import cenpy
 import lehd
 
@@ -97,3 +113,63 @@ def dl(region):
     df = pd.merge(df,dfl,left_on ="geoid", right_on ="h_geoid_BG", how = "outer")
     del df["h_geoid_BG"]
     df.to_csv(out_data_path, index = False)
+
+
+def dots(region):
+
+    # variables for generating dots
+    demo_vars = ['pop_total','pop_white','pop_black','pop_asiapacific','pop_hispanic','pop_indig','pop_otherrace','pop_poverty','hhld_total','hhld_total_w_chld','hhld_single_mother','workers_all','workers_essential']
+    # number of dots to generate per count in each variable
+    demo_dot_counts = [50,50,50,50,50,50,50,50,25,25,25,25,25,25]
+
+    # paths
+    block_group_path = "data/" + region + "/input/boundary_data/block_group_poly.geojson"
+    demo_data_path = "data/" + region + "/input/population_data/"
+    demo_file_name = "demographics.csv"
+    dots_file_name = "demo_dots.csv"
+
+    # function for generating random dot in polygon (from StackExchange)
+    def generate_random(number, polygon):
+        points = []
+        minx, miny, maxx, maxy = polygon.bounds
+        while len(points) < number:
+            pnt = shapely.geometry.Point(random.uniform(minx, maxx), random.uniform(miny, maxy))
+            if polygon.contains(pnt):
+                points.append(pnt)
+        return points
+
+    # reading in demographic and polygon data
+    gdf = gpd.read_file(block_group_path)
+    gdf["GEOID"] = gdf["GEOID"].astype(str)
+    dfd = pd.read_csv(demo_data_path + demo_file_name)
+    dfd["geoid"] = dfd["geoid"].astype(str)
+    gdf = pd.merge(gdf,dfd, left_on = "GEOID", right_on = "geoid")
+
+    # loop over each row in the demographic file
+    output = [["geoid","x","y","var","N","dots_per_N","n_dots"]]
+    for index, row in gdf.iterrows():
+        i = 0
+        # loop over each variable, getting number of dots to generate
+        while i < len(demo_vars):
+            var = demo_vars[i]
+            N = row[demo_vars[i]]
+            dots_per_N = demo_dot_counts[i]
+            try:
+                n_dots = round(N/dots_per_N)
+            except:
+                n_dots = 0
+            n = 0
+            # generate dots
+            while n < n_dots:
+                pts = generate_random(1,row["geometry"])
+                x = round(pts[0].x,5)
+                y = round(pts[0].y,5)
+                output.append([row["geoid"],x,y,var,N,dots_per_N,n_dots])
+                n += 1
+            i += 1
+
+    # write the output to CSV
+    with open(demo_data_path + dots_file_name, 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for row in output:
+            writer.writerow(row)
