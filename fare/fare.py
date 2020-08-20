@@ -15,8 +15,8 @@ def list_mode(json_trip):
     list_modes = []
     inter_leg_walk = [] 
     try:    
-        for i in range(len(data['OTP_itinerary_all']['plan']['itineraries'][0]['legs'])):
-            if data['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][i]['mode'] != "WALK":
+        for i in range(len(json_trip['OTP_itinerary_all']['plan']['itineraries'][0]['legs'])):
+            if json_trip['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][i]['mode'] != "WALK":
                 list_modes.append(i)
             if 0 < i < max(list_modes):
                 inter_leg_walk.append(i)
