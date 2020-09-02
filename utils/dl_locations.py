@@ -51,7 +51,7 @@ class get_destination_data:
         self.region = region
 
         # load in file paths
-        with open('data_folder.cfg', 'r') as d:
+        with open('utils/data_folder.cfg', 'r') as d:
             d = d.read()
         self.data_paths = json.loads(d)
 
@@ -121,13 +121,13 @@ class get_destination_data:
             lehd_wac = lehd_wac[lehd_wac['county_id'].isin(self.region_info["county_id"])]
 
             # create a field for block group
-            lehd_wac["block_group_id"] = (lehd_wac["w_geocode"] / 1000).astype(int)
+            lehd_wac["GEOID"] = (lehd_wac["w_geocode"] / 1000).astype(int)
 
             # delete columns we do not want to tabulate
             del lehd_wac['w_geocode'], lehd_wac['createdate'], lehd_wac['county_id']
 
             # group by block_group_id and count the number of jobs
-            lehd_wac = lehd_wac.groupby(['block_group_id']).sum()
+            lehd_wac = lehd_wac.groupby(['GEOID']).sum()
 
             # append into the output
             if dfo is None:
