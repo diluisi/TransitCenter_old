@@ -95,7 +95,7 @@ class FileConfig():
 
         # Transit Feeds Key
         config['API'] = {}
-        config['API']['key'] = 'f2a91a7e-154d-434a-8083-2cd18e25f3d2' 
+        config['API']['key'] = None
 
         config['General'] = {}
         config['General']['county_ids'] = path + '/data/General/county_ids.csv' 
@@ -135,6 +135,7 @@ class FileConfig():
             # OTP
             config[REGION]['graphs'] = path + '/data/' + REGION + '/otp/graphs'  
             config[REGION]['itinerary'] = path + '/data/' + REGION + '/otp/itinerary' 
+            config[REGION]['premium_routes'] = None
         
         config['Boston']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'
         config['New York']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
