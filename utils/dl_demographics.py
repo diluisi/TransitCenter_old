@@ -106,6 +106,7 @@ def dl(region):
         LEHDcat = row['LEHD']
         e_share = row['e_share']
         dfl["workers_essential"] = dfl["workers_essential"] + dfl[LEHDcat] * e_share
+    dfl["workers_essential"] = dfl["workers_essential"].round(0)
 
     dfl = dfl[["h_geoid_BG","workers_all","workers_essential"]]
 
