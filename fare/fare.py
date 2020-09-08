@@ -7,8 +7,16 @@ Created on Thu Jul 30 22:53:37 2020
 """
 import sqlite3
 import json
+import os
+import sys
 
-DB_NAME = 'FareDB.db'
+from pathlib import Path
+fare_path = str(Path(os.getcwd()).parent) + '/fare'
+
+
+
+DB_NAME = fare_path + '/FareDB.db'
+print(DB_NAME)
 
 # recebe somente trips que possuem um caminho alcançável
 def list_mode(json_trip):
