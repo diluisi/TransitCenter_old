@@ -23,9 +23,13 @@ import os
 import pandas as pd
 import syslog
 import requests, json
+from pathlib import Path
 
-CONFIG_FILE_NAME='config.ini' #example
-REGIONS_DEFAULT = ['Boston', 'NYC'] #example
+path = str(Path(os.getcwd()).parent)
+
+
+CONFIG_FILE_NAME='config.cfg' #example
+REGIONS_DEFAULT = ['Boston', 'New York', 'Philadelphia', 'District of Columbia', 'Chicago','Los Angeles','San Francisco-Oakland'] #example
 OTP_CONFIG_FILE = 'otp_config.ini'
 
 class FileConfig():
@@ -76,7 +80,7 @@ class FileConfig():
 # WRITE config file
 #*****************************************************************************
     # Template config.ini
-    def write_default_config(self, region_list):
+    def write_default_config(self, region_list=REGIONS_DEFAULT):
         """Writes a template for configuration file.
 
         It needs a region list.
@@ -87,38 +91,61 @@ class FileConfig():
             List of regions.
         """
         # Object to store configurations
-        config = self.config_parser  
+        config = self.config_parser
+
+        # Transit Feeds Key
+        config['API'] = {}
+        config['API']['key'] = 'f2a91a7e-154d-434a-8083-2cd18e25f3d2' 
+
+        config['General'] = {}
+        config['General']['county_ids'] = path + '/data/General/county_ids.csv' 
+        config['General']['us_osm'] = path + '/data/General/us-latest.osm.pbf' 
+        config['General']['transit_feeds'] = 'Boston, New York, Philadelphia, District of Columbia, Chicago, Los Angeles'
+        config['General']['transit_land'] = 'San Francisco-Oakland'
+        config['General']['gen'] = path + '/data/General' 
+        config['General']['otp_input'] = path + '/otp/otp_input'
+        config['General']['otp'] = path + '/otp'
+
         # Paths
         for REGION in region_list:
             # Boston region config
             config[REGION] = {}   
             # Boundary data
-            config[REGION]['block_group_polygons'] = './input/boundary_data/block_group_poly.geojson'
-            config[REGION]['block_group_points'] = './input/boundary_data/block_group_pts.geojson'
-            config[REGION]['country_boundaries'] = './input/boundary_data/country_boundaries.geojson'
-            config[REGION]['region_boundary'] = './input/boundary_data/region_boundary.geojson'   
+            config[REGION]['block_group_polygons'] = path + '/data/' + REGION + '/input/boundary_data/block_group_poly.geojson'
+            config[REGION]['block_group_points'] = path + '/data/' + REGION + '/input/boundary_data/block_group_pts.csv'
+            config[REGION]['tract_polygons'] = path + '/data/' + REGION + '/input/boundary_data/tract_poly.geojson'
+            config[REGION]['tract_points'] = path + '/data/' + REGION + '/input/boundary_data/tract_pts.csv'
+            config[REGION]['county_boundaries'] = path + '/data/' + REGION + '/input/boundary_data/country_boundaries.geojson'
+            config[REGION]['region_boundary'] = path + '/data/' + REGION + '/input/boundary_data/region_boundary.geojson'   
             # Open Street Map
-            config[REGION]['osm'] = './input/osm_data/osm.pbf'   
+            config[REGION]['osm'] = path + '/data/' + REGION + '/input/osm_data/'   
             # Population data
-            config[REGION]['population_data'] = './input/population_data/'   
+            config[REGION]['population_data'] = path + '/data/' + REGION + '/input/population_data/'   
             # Destination data
-            config[REGION]['destination_data'] = './input/destination_data/destination_employment_lehd.csv'   
+            config[REGION]['destination_data'] = path + '/data/' + REGION + '/input/destination_data/destination_employment_lehd.csv'   
             # GTFS
-            config[REGION]['gtfs_static'] = './input/gtfs/gtfs_static'
-            config[REGION]['gtfs_rt'] = './input/gtfs/gtfs_realtimes'   
+            config[REGION]['gtfs_static'] = path + '/data/' + REGION + '/input/gtfs/gtfs_static'
+            config[REGION]['gtfs_rt'] = path + '/data/' + REGION + '/input/gtfs/gtfs_realtimes'   
             # Output
-            config[REGION]['accessibility'] = './input/output/accessibility_calc_output'
-            config[REGION]['equity'] = './input/output/equity_calc_output'
-            config[REGION]['fare'] = './input/output/fare_calc_output'
-            config[REGION]['reliability'] = './input/output/fare_calc_output'
-            config[REGION]['service'] = './input/output/servicehours_calc_output'   
+            config[REGION]['accessibility'] = path + '/data/' + REGION + '/input/output/accessibility_calc_output'
+            config[REGION]['equity'] = path + '/data/' + REGION + '/input/output/equity_calc_output'
+            config[REGION]['fare'] = path + '/data/' + REGION + '/input/output/fare_calc_output'
+            config[REGION]['reliability'] = path + '/data/' + REGION + '/input/output/fare_calc_output'
+            config[REGION]['service'] = path + '/data/' + REGION + '/input/output/servicehours_calc_output'   
             # OTP
-            config[REGION]['otp'] = '/home/diluisi/Documentos/OTP/Boston/OTP.info'   
-            # Points
-            config[REGION]['points'] = '/home/diluisi/Documentos/OTP/Boston/Boston_block_group_pts.csv'      
+            config[REGION]['graphs'] = path + '/data/' + REGION + '/otp/graphs'  
+            config[REGION]['itinerary'] = path + '/data/' + REGION + '/otp/itinerary' 
+        
+        config['Boston']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'
+        config['New York']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
+        config['Philadelphia']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
+        config['Chicago']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
+        config['District of Columbia']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
+        config['Los Angeles']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
+        config['San Francisco-Oakland']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'      
 
     def export_config(self, config_file=CONFIG_FILE_NAME):
-        """Exports configuration file as *.ini
+        """Exports configuration file as *.cfg
 
         Parameters
         ----------

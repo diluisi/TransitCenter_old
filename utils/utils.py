@@ -11,10 +11,16 @@ import pandas as pd
 import urllib
 from urllib.request import urlopen
 import configparser
-import os
+import os, os.path
 
-config = configparser.ConfigParser()
-config.read('../config.cfg')
+
+if os.path.isfile('config.cfg'):
+    config = configparser.ConfigParser()
+    config.read('config.cfg')
+else:
+    config = configparser.ConfigParser()
+    config.read('../config.cfg')
+    
 class county_ids:
 
 
