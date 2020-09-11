@@ -67,6 +67,8 @@ def dl(region):
 
     df = pd.concat(dfs)
 
+
+
     # creating a combined block group csv
     df["geoid"] = df["state"] + df["county"] + df["tract"] + df["block group"]
     del df["state"], df["county"], df["tract"], df["block group"]
@@ -85,6 +87,7 @@ def dl(region):
     df["hhld_total_w_chld"] = df['B11005_002E'].astype(int) # total households with children (<18 years old)
     df["hhld_single_mother"] = df['B11005_007E'].astype(int) # total single mother households (<18 years old)
     df.drop(variables, inplace=True, axis=1) # dropping unneeded variables
+
 
 
     # bringing in shares for essential worker by LEHD NAICS category
@@ -109,6 +112,7 @@ def dl(region):
     dfl["workers_essential"] = dfl["workers_essential"].round(0)
 
     dfl = dfl[["h_geoid_BG","workers_all","workers_essential"]]
+
 
     # merge and save the output
     df = pd.merge(df,dfl,left_on ="geoid", right_on ="h_geoid_BG", how = "outer")

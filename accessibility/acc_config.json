@@ -1,26 +1,28 @@
 {
 	"impedences": [
+		"single":[
+			{
+				"function": "cumulative",
+				"cost": "time",
+				"params": [30],
+				"name": "cumt30"
+			},
+			{
+				"function": "cumulative",
+				"cost": "fare",
+				"params": [5],
+				"name": "cumf5"
+			}
+		],
+		"combined": [
+				{
+					"name": "cumf5t30",
+					"input": ["cumf5","cumt30"]
+					"how": "product"
+				}
+			]
+	"measures": [
 		{
-			"function": "cumulative",
-			"cost": "time",
-			"params": [30],
-			"name": "cumt30"
-		},
-		{
-			"function": "cumulative",
-			"cost": "fare",
-			"params": [5],
-			"name": "cumf5"
-		}
-	],
-	"impedences_combined": [
-		{
-			"name": "cumf5t30",
-			"input": ["cumf5","cumt30"]
-			"how": "product"
-		}
-	]
-	"measures": [{
 			"name": "A_fCijt30_C000",
 			"description": "number of jobs reachable within 30 minutes",
 			"type": "potential",
@@ -35,7 +37,7 @@
 			"impedence": "cumf5t30"
 		},
 		{
-			"name": "A_fCijt30_C000",
+			"name": "A_minT3_snap",
 			"description": "number of jobs reachable within 30 minutes and under 5 dollars",
 			"type": "mintraveltime",
 			"destination": "snap",
