@@ -93,5 +93,35 @@ def transit_accessibility(region):
         # output to dfa
 
 
+def auto_accessibility(region):
 
-transit_accessibility("Boston")
+    # get complete list of block groups
+    dfo = pd.read_csv("data/" + region + "/input/boundary_data/" + "block_group_pts.csv")
+    dfo = dfo[["GEOID"]]
+
+    # load in supply data
+    for dataset in ["employment.csv"]:
+        dftemp = pd.read_csv("data/" + region + "/input/destination_data/" + dataset)
+        dfo = pd.merge(dfo,dftemp, how='left', left_on="GEOID", right_on="GEOID")
+    del dftemp
+    # dfo["schools"] = dfo["count"]
+    # dfo["greenspace"] = dfo["area"]
+    # del dfo["count"], dfo["area"]
+    dfo = dfo.fillna(0)
+
+
+    # # loading in the accessibility config file
+    # with open('accessibility/acc_config.json', 'r') as myfile:
+    #     accessibility_config=myfile.read()
+    # # parse file
+    # accessibility_config = json.loads(accessibility_config)
+
+
+    dft = pd.read_csv("data/" + region + "/input/auto_travel_times/NY_8am.csv.gzip", compression = "gzip")
+
+    print(dft)
+
+
+    
+
+auto_accessibility("New York")
