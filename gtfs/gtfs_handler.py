@@ -270,13 +270,16 @@ class get:
                             pass
                         try:          
                             gtfs_file = GTFS.load_zip(dir)
+                            num_stops = gtfs_file.route_stops_inside(config[region]['region_boundary']).sum()[0]
                             dt_st = str(gtfs_file.summary().first_date.date())
                             dt_end = str(gtfs_file.summary().last_date.date())
                             op_url = gtfs_file.agency['agency_url'][0]
+                            
                         except:
                             dt_st = None
                             dt_end = None
                             op_url = None
+                            num_stops = 2 # this means gtfs-lite wasn't able to open the file, so we should keep the feed to be safe
     
                         for index, row in stops.iterrows():
                             if(pd.isnull(row['stop_lat'])):
@@ -297,12 +300,18 @@ class get:
                         dt_st = None
                         dt_end = None
                         op_url = None
+                        num_stops = 2
                         shutil.rmtree(dir_name)
                 except:
                     dt_st = None
                     dt_end = None
                     op_url = None
-                    
+                    num_stops = 2
+                
+                if num_stops < 2:
+                    os.remove(dir_name + '.zip')
+                    continue
+                
                 feed_info_lst.append(list([name, op_url, loc, agencies['id'], dt_str, dt_st, dt_end, api_url]))
         
         if region == 'District of Columbia':
