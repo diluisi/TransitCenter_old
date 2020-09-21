@@ -51,7 +51,7 @@ class get_destination_data:
         self.region = region
 
         # load in file paths
-        with open('utils/data_folder.cfg', 'r') as d:
+        with open('data_folder.cfg', 'r') as d:
             d = d.read()
         self.data_paths = json.loads(d)
 
@@ -121,13 +121,13 @@ class get_destination_data:
             lehd_wac = lehd_wac[lehd_wac['county_id'].isin(self.region_info["county_id"])]
 
             # create a field for block group
-            lehd_wac["GEOID"] = (lehd_wac["w_geocode"] / 1000).astype(int)
+            lehd_wac["block_group_id"] = (lehd_wac["w_geocode"] / 1000).astype(int)
 
             # delete columns we do not want to tabulate
             del lehd_wac['w_geocode'], lehd_wac['createdate'], lehd_wac['county_id']
 
             # group by block_group_id and count the number of jobs
-            lehd_wac = lehd_wac.groupby(['GEOID']).sum()
+            lehd_wac = lehd_wac.groupby(['block_group_id']).sum()
 
             # append into the output
             if dfo is None:
@@ -194,14 +194,14 @@ class get_destination_data:
         rx_geom = gpd.sjoin(rx_geom, block_geom, how="inner", op='intersects')
         rx_block = rx_geom.groupby(['GEOID']).count()[['Name']]
         rx_block.columns = ['pharmacies']
-
+    
 
         healthcare = hospital.join(rx_block, how = 'outer')
         healthcare = healthcare.join(urgent_care, how = 'outer')
         healthcare = healthcare.fillna(0)
 
         healthcare.to_csv(output_file_path)
-
+    
     def get_education(self):
         # set up path for where to download and store the data
         file_path = self.region_folder_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["folder_name"]
@@ -228,7 +228,7 @@ class get_destination_data:
         # count facilities
         university = university_geom.groupby(['GEOID']).count()[['OBJECTID']]
         university.columns = ['university']
-        supp_college = supp_college_geom.groupby(['GEOID']).count()[['FID']]
+        supp_college = supp_college_geom.groupby(['GEOID']).count()[['OBJECTID']]
         supp_college.columns = ['supp_college']
 
 
@@ -291,7 +291,7 @@ class get_destination_data:
 
         file_path = self.region_folder_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["folder_name"]
         output_file_path = file_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["destination_data"]["contents"]["greenspace"]
-
+        
         block_group_poly_path = self.input_data_path + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["folder_name"] + self.data_paths["contents"]["region_data"]["contents"]["input"]["contents"]["boundary_data"]["contents"]["block_group_polygons"]
 
 
@@ -303,7 +303,7 @@ class get_destination_data:
 
         api = overpy.Overpass()
 
-        query = """
+        query = """ 
         [out:json];
         (
 
@@ -331,7 +331,7 @@ class get_destination_data:
         way["landuse"="vineyard"]{0};
         way["landuse"="village_green"]{0};
         way["landuse"="forest"]{0};
-
+        
         relation["leisure"="park"]{0};
         relation["leisure"="nature_reserve"]{0};
         relation["leisure"="playground"]{0};
@@ -368,11 +368,11 @@ class get_destination_data:
             coords = []
             for node in way.nodes:
                 coords.append((node.lon, node.lat))
-
+                
             line.append(geometry.LineString(coords))
 
-        merged = linemerge([*line])
-        borders = unary_union(merged)
+        merged = linemerge([*line]) 
+        borders = unary_union(merged) 
         polygons = list(polygonize(borders))
 
         parks = gpd.GeoDataFrame(geometry=gpd.GeoSeries(polygons))
