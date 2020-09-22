@@ -24,30 +24,30 @@ import glob
 import datetime
 from datetime import timedelta
 import random
+from contextlib import contextmanager
+import csv
 
 
 #command line arguments
 parser = argparse.ArgumentParser(description='Process region')
 parser.add_argument("-d", '--date', default = datetime.datetime.now().strftime('%Y-%m-%d'), help="input date for otp in YYYY-MM-DD")
-parser.add_argument("-m", '--mode', default = 'TRANSIT', help="mode to check, must be supported by GTFS standards")
 parser.add_argument("-r", '--region',  help="region")
 parser.add_argument("-p", '--threads', default = 4, help="number of threads")
 parser.add_argument("-z", '--period', help="time period, AM, EVE , MID")
-parser.add_argument("-b", '--lowcost', default=False, action='store_true', help="boolean, if evaluating a non-premium network")
+
 
 #reading the arguments
 args = parser.parse_args()
 date = args.date
-mode = args.mode
+mode = 'TRANSIT'
 region = args.region
 threads = int(args.threads)
 period = args.period
-lowcost = args.lowcost
 
 
 #finds the config file depending if the python script is called directly, or through otp_main.py
 if os.path.isfile('config.cfg'):
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser() 
     config.read('config.cfg')
 else:
     config = configparser.ConfigParser()
@@ -59,16 +59,17 @@ graph_path = config[region]['graphs']
 otp_path = config['General']['otp'] 
 outpath = config[region]['itinerary']
 
-if lowcost == True:
-    # bans premium routes if any are set
-    lowcost_flag = config[region]['premium_routes']
-    lowcost_str = 'Lowcost'
-else:
-    lowcost_flag = None
-    lowcost_str = 'All'
 
-def run_rabbit_run(num, i, path, hr, minute, o_date):
-    print ("running", i)
+#reads the list of premium routes to ban
+results = []
+with open(config[region]['gtfs_static'] + '/premium_routes.csv' , newline='') as f:
+    for row in csv.reader(f):
+        results.append(row[0])
+banned_routes = ','.join(results)
+
+
+def run_rabbit_run(num, o_path, path, hr, minute, o_date, suffix):
+    print ("running", o_path)
     
     minute = ("{:02d}".format(int(minute)))
     
@@ -76,9 +77,20 @@ def run_rabbit_run(num, i, path, hr, minute, o_date):
     #see otp_travel_times.py 
     call(["/Users/Rick/jython2.7.2/bin/jython", '-Dpython.path='+otp_path+'/otp-1.4.0-shaded.jar', 
           config['General']['otp'] + '/otp_travel-times.py', 
-          '--date', date, '--hour', str(hr), '--minute', minute, '--mode', mode, '--o_path', i, '--d_path', 
+          '--date', date, '--hour', str(hr), '--minute', minute, '--mode', mode, '--o_path', o_path, '--d_path', 
           pts_path, '--num', num
-          , '-x', path, '--region', region, '--graph', graph_path, '-a', o_date, '-b', lowcost_flag])
+          , '--out', path, '--region', region, '--graph', graph_path, '--o_date', o_date, '--lowcost', banned_routes, 
+          '--suffix', suffix])
+
+# temporarily changes working directory
+@contextmanager
+def cwd(path):
+    oldpwd=os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(oldpwd)
 
 if __name__ == '__main__':
     
@@ -122,6 +134,14 @@ if __name__ == '__main__':
     else:
         pass
     
+    # adding the directories to save the file into
+    os.makedirs(outpath + '/' + 'travel_times', exist_ok=True)
+    os.makedirs(outpath + '/' + 'travel_times/' + str(date), exist_ok=True)
+    os.makedirs(outpath + '/' + 'travel_times/' + str(date) + '/period' + period , exist_ok=True)
+    
+    # directory for the output path
+    json_path = outpath + '/' + 'travel_times/' + str(date) + '/period' + period 
+    
     # setting up the list of arguments for the otp function
     period_param = []
     for i in hr_lst:
@@ -130,15 +150,8 @@ if __name__ == '__main__':
             rand = random.randint(j*15,(j+1)*15-1)
             temp = (i, rand)
             period_param.append(temp)
-    
-    # adding the directories to save the file into
-    os.makedirs(outpath + '/' + 'matrix_' + str(date), exist_ok=True)
-    os.makedirs(outpath + '/' + 'matrix_' + str(date) + '/period' + period, exist_ok=True)
-    os.makedirs(outpath + '/' + 'matrix_' + str(date) + '/period' + period + '/mode' + lowcost_str, exist_ok=True)
-    
-    # directory for the output path
-    json_path = outpath + '/' + 'matrix_' + str(date) + '/period' + period + '/mode' + lowcost_str
-    
+            os.makedirs(json_path + '/' + str(temp[0]) + "{:02d}".format(temp[1]) + '_all')
+            os.makedirs(json_path + '/' + str(temp[0]) + "{:02d}".format(temp[1]) + '_lowcost')
     
     #reading the block pts
     df_pts = pd.read_csv(pts_path)
@@ -159,34 +172,50 @@ if __name__ == '__main__':
     
     c = 0
     for j in range(8):
-        param = []
-        for i in range(threads):
+        for k in ['lowcost', 'all']:
+            param = []
+            for i in range(threads):
+
             
-            #tupple containing the path to the partitioned block group pts file, output directory, time bin, and date
-            tup = (str(c), path_parts[i], json_path, period_param[j][0], period_param[j][1], o_date)
-            param.append(tup)
-            c = c + 1
+                #tupple containing the path to the partitioned block group pts file, output directory, time bin, and date
+                tup = (str(c), path_parts[i], json_path, period_param[j][0], period_param[j][1], o_date, k)
+                param.append(tup)
+                c = c + 1
             
-        # running the otp function
-        pool.starmap(run_rabbit_run, param)
+            # running the otp function
+            pool.starmap(run_rabbit_run, param)
+        
+        with cwd(json_path + '/' + str(period_param[j][0]) + "{:02d}".format(period_param[j][1]) + '_all'):        
+            # combining the results of each of the threaded otp output into 1 csv file
+            extension = 'csv'
+            all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
+            tt_all = pd.concat([pd.read_csv(f) for f in all_filenames ])
+            for f in all_filenames:
+                os.remove(f)
+                
+        with cwd(json_path +  '/' + str(period_param[j][0]) + "{:02d}".format(period_param[j][1]) + '_lowcost' ):        
+            # combining the results of each of the threaded otp output into 1 csv file
+            extension = 'csv'
+            all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
+            tt_lowcost = pd.concat([pd.read_csv(f) for f in all_filenames ])
+            for f in all_filenames:
+                os.remove(f)
+                
+    
+        tt = pd.merge(tt_all, tt_lowcost, on = ['o_block', 'd_block'], how = 'outer')
+        
+        #export to csv
+        tt.to_csv(json_path + '/' + str(period_param[j][0]) + "{:02d}".format(period_param[j][1]) + ".csv", index=False)
+        # tt_all.to_csv(json_path + '/' + str(period_param[j][0]) + "{:02d}".format(period_param[j][1]) + "_all.csv", index=False)
+        # tt_lowcost.to_csv(json_path + '/' + str(period_param[j][0]) + "{:02d}".format(period_param[j][1]) + "_lowcost.csv", index=False)
+        
+        os.rmdir(json_path + '/' + str(period_param[j][0]) + "{:02d}".format(period_param[j][1]) + '_all')
+        os.rmdir(json_path + '/' + str(period_param[j][0]) + "{:02d}".format(period_param[j][1]) + '_lowcost')
         
     pool.close()
     
     # removing all the partitioned files
     for f in path_parts:
         os.remove(f)
-
-    #combining the results of each of the threaded otp output into 1 csv file
-    os.chdir(json_path)
-    extension = 'csv'
-    all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
-    od_matrix = pd.concat([pd.read_csv(f) for f in all_filenames ])
-    for f in all_filenames:
-        os.remove(f)
-    #export to csv
-    od_matrix.to_csv("otp_matrix" + '-' + str(date) + '_period' + period + '_' + mode + ".csv", index=False)
-
-
-
 
     print (time.time() - start_time)
