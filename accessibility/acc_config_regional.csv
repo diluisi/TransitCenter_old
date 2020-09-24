@@ -1,0 +1,8 @@
+region,fare_threshold,median_time_work,median_time_school,median_time_groceries,median_time_parks,median_time_healthcare
+Boston,8,,,,,
+Chicago,6,,,,,
+District of Columbia,8,,,,,
+Los Angeles,7,,,,,
+New York,7,30,30,11,15,20
+Philadelphia,6,,,,,
+San Francisco-Oakland,11,,,,,
