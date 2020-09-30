@@ -31,7 +31,8 @@ import sqlite3
 # Database
 DB_NAME = 'FareDB.db'
 # List of agencies using NTD database
-EXCP = ["NJB","NJT"]
+EXCP = ["NJ TRANSIT BUS","NJ TRANSIT RAIL", "Long Island Rail Road", "Metro-North Railroad", "Shore Line East",
+        "MNR Hudson Rail Link","NY Waterway"]
 
 
 # Exclude WALK mode and keep only legs with a valid mode
