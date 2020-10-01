@@ -17,6 +17,7 @@ import sys
 import time
 import os
 import traceback
+import csv
 
 from pathlib import Path
 root_path = Path(os.getcwd())
@@ -31,16 +32,17 @@ parser.add_argument("-d", '--date', default = datetime.datetime.now().strftime('
 parser.add_argument("-r", '--region',  help="Region to evaluate")
 parser.add_argument("-p", '--threads', default = 5, help="number of threads")
 parser.add_argument("-z", '--period', help="time period, AM, EVE, MID")
-parser.add_argument("-b", '--lowcost', default=False, action='store_true', help="if evaluating a premium network")
+#parser.add_argument("-b", '--lowcost', default=False, action='store_true', help="if evaluating a premium network")
 
 args = parser.parse_args()
 
 date = args.date
 region = args.region
 threads = int(args.threads)
-lowcost = args.lowcost
+#lowcost = args.lowcost
 period = args.period
 
+lowcost = True
 
 config = configparser.ConfigParser()
 
@@ -57,8 +59,14 @@ graph_path = config[region]['graphs']
 otp_path = config['General']['otp']
 
 if lowcost == True:
-    premium_routes = config[region]['premium_routes']
-    mode = config[region]['low_cost_modes']
+    #reads the list of premium routes to ban
+    results = []
+    with open(config[region]['gtfs_static'] + '/premium_routes.csv' , newline='') as f:
+        for row in csv.reader(f):
+            results.append(row[0])
+    premium_routes = ','.join(results)
+    #premium_routes = results
+    mode = 'TRANSIT'
 else:
     mode = 'TRANSIT'
     premium_routes = None
@@ -68,9 +76,12 @@ def call_otp():
     
     command = ['java', '-Xmx4G', '-jar', otp_path+'/otp-1.4.0-shaded.jar', '--router', 'graphs-'+date,
           '--graphs', graph_path, '--server', '--enableScriptingWebService']
+    
+    print('\njava -Xmx4G -jar ' + otp_path+'/otp-1.4.0-shaded.jar'+ ' --router '+ 'graphs-'+date+
+          ' --graphs '+graph_path+' --server'+' --enableScriptingWebService\n')
     p = Popen(command)
     
-    time.sleep(60) #time needed to ensure the otp server starts up
+    time.sleep(300) #time needed to ensure the otp server starts up
     return p
 
 # function to return the itineraries
@@ -87,7 +98,7 @@ def return_itineraries(ox,oy,dx,dy,date_us,hr,minute):
    		'clampInitialWait':0,
    		'wheelchair':False,
    		#'batch': True,
-        'BannedRoutes':premium_routes,
+        'bannedRoutes':premium_routes,
    		'numItineraries': 1
    	}
    
@@ -206,7 +217,15 @@ if __name__ == '__main__':
         
         dest_lst = []
         start = 0
+        print(index)
+        # if index == 5:
+        #     break
         for index2, row2 in df_120.groupby(df_120.index // threads):
+            
+            print(index2)
+            # if index2 == 50:
+            #     break
+            
             #looping origins
             param = []
             dest_lst = []
@@ -263,7 +282,18 @@ if __name__ == '__main__':
                             continue
                         
                         output_lst.append([origin, dest_lst[j], str(tm), period,lowcost, fare_cost, result[j]['plan']['itineraries'][0]['duration']])
-                    
+
+                        error_data = error_dict 
+                        error_data['origin_tract'] = origin
+                        error_data['destination_tract'] = dest_lst[j]
+                        error_data['departure_datetime'] = str(tm)
+                        error_data['fare_dict'] = result[j]['plan']
+                        error_data['traceback'] = traceback.format_exc()
+                        
+                        error_json.append(error_data)
+                
+
+
                     except:
                         error_data = error_dict 
                         error_data['origin_tract'] = origin
@@ -275,9 +305,7 @@ if __name__ == '__main__':
                         error_json.append(error_data)
                 
             
-        # print(index)
-        # if index == 5:
-        #     break
+
 
 
     end_time = time.time()
@@ -291,7 +319,7 @@ if __name__ == '__main__':
         print('Some fares could not be calculated. See the error file.')
         error_path = outpath+'/MissingFare_'+region+'_'+period+'_'+mode+'_'+date + '.json'
         with open(error_path, 'w') as f:
-            json.dump(error_data, f)
+            json.dump(error_json, f)
 
 
     print(len(output))
