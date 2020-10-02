@@ -57,19 +57,19 @@ class get:
         for operator in all_operators_json:
             for onestop_id in operator["represented_in_feed_onestop_ids"]:
                 feed_base_info.append([onestop_id, operator["name"],operator["website"],operator["state"],operator["metro"],operator["timezone"]])
-            
+        
+        os.makedirs(config[region]['gtfs_static'] + "/feeds_" + input_date, exist_ok=True)
         
         # loop over feed info, getting info for each feed, and saving to an output array
-        
-        output_feed_info = [["operator_name", "operator_website", "operator_metro", "feed_id", "date_fetched", "earliest_calendar_date", "latest_calendar_date", "url"]]
+        counter = 0
+        output_feed_info = []
         for feed_info in feed_base_info:
-            
+
             # base info
             operator_name = feed_info[1]
             operator_website = feed_info[2]
             operator_metro = feed_info[4]
-            
-            
+
             # get feed versions
             response = requests.get(
             "https://transit.land/api/v1/feed_versions",
@@ -85,11 +85,11 @@ class get:
             try:
                 nfeeds = (len(feeds["feed_versions"]))
                 if nfeeds > 0:
-        
+                    if feeds["feed_versions"][0]["feed"] in list(banned['transit_land_id']):
+                        continue
                     # looping over feed versions
                     i = nfeeds - 1
                     while i >= 0: 
-        
                         # grabbing date info
                         date_fetched_iso8601 = feeds["feed_versions"][i]["fetched_at"]
                         date_fetched = str(date_fetched_iso8601)[0:10]
@@ -97,80 +97,96 @@ class get:
         
                         # checking if before the input date
                         if date_fetched_int < input_date_int:
-        
+                            
+
                             # output info
                             date_fetched = date_fetched
                             earliest_calendar_date = feeds["feed_versions"][i]["earliest_calendar_date"]
                             latest_calendar_date = feeds["feed_versions"][i]["latest_calendar_date"]
                             transitland_historical_url = feeds["feed_versions"][i]["download_url"]
                             feed_id = feeds["feed_versions"][i]["feed"]                    
-                            output_feed_info.append([operator_name, operator_website, operator_metro, feed_id, date_fetched, earliest_calendar_date, latest_calendar_date, transitland_historical_url])
                             
+                            
+                            
+                            
+                            try:
+                                counter = counter + 1
+                                name = operator_name
+                                feed_publisher_name = operator_name
+
+                                dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date +'-'+ str(counter)
+
+                                urllib.request.urlretrieve(transitland_historical_url, dir_name + ".zip")
+
+                                try:
+                                    shutil.unpack_archive(dir_name + '.zip', dir_name)
+                
+                                    stops = pd.read_csv(dir_name + '/stops.txt')
+                                    try:
+                                        os.remove(dir_name + '/pathways.txt')
+                                    except:
+                                        pass
+                
+                                    try:
+                                        gtfs_file = GTFS.load_zip(dir_name + '.zip')
+                                        num_stops = gtfs_file.route_stops_inside(config[region]['region_boundary']).sum()[0]
+                                    except: 
+                                        num_stops = 2
+                                        
+
+                                    if num_stops < 2:
+                                        os.remove(dir_name + '.zip')
+                                        os.remove(dir_name)
+                                        continue
+                
+                                    for index, row in stops.iterrows():
+                                        if(pd.isnull(row['stop_lat'])):
+                                            stops.at[index, 'stop_lat'] = 0
+                                            stops.at[index, 'stop_lon'] = 0
+                                            
+                                    try:
+                                        os.remove(dir_name + '/feed_info.txt')
+                                    except:
+                                        pass
+                
+                                    feed_txt_lst = []
+                                    feed_publisher_name = name
+                                    feed_publisher_url = name
+                                    feed_lang = 'EN'
+                                    feed_startdate = '20200101'
+                                    feed_enddate = '20201201'
+                                    feed_version = '1'
+                                    feed_id = feed_id
+                                    feed_txt_lst.append(list([feed_publisher_name, feed_publisher_url, feed_lang, feed_startdate, feed_enddate, feed_version, feed_id]))
+                                    feed_txt = pd.DataFrame(feed_txt_lst, columns = ['feed_publisher_name' , 'feed_publisher_url', 'feed_lang', 'feed_start_date', 'feed_end_date', 'feed_version','feed_id']) 
+                                    feed_txt.to_csv(dir_name+'/feed_info.txt', index = False)
+                                    stops.to_csv(dir_name+'/stops.txt', index = False)
+                
+                                    shutil.make_archive(dir_name, 'zip', dir_name)
+                
+                                    shutil.rmtree(dir_name)
+                                except:
+                
+                                    shutil.rmtree(dir_name)
+                                sleep(1)
+                                
+                            except:
+                                pass
+                            print(name)
+                            output_feed_info.append([operator_name, operator_website, operator_metro, feed_id, date_fetched, earliest_calendar_date, latest_calendar_date, transitland_historical_url])
+
                             break # break since this should be the most recent
         
                         else:
                             None
         
                         i = i - 1
-            
             except:
                 None
-        
-        # make sub directory for the GTFS
-        os.makedirs(config[region]['gtfs_static'] + "/feeds_" + input_date, exist_ok=True)
-        
-        # write this info to a csv file, downloading the GTFS at the same time
-        gtfs_zips_to_dl = []
-        with open(config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", "w") as csvfile:
-            writer = csv.writer(csvfile)
-            for row in output_feed_info:
-                writer.writerow(row)
-                gtfs_zip = [row[0],row[7], row[3]]
-                if gtfs_zip not in gtfs_zips_to_dl:
-                    if gtfs_zip[2] not in list(banned['transit_land_id']):
-                        gtfs_zips_to_dl.append(gtfs_zip)
-        counter = 0    
+    
+        feed_info = pd.DataFrame(output_feed_info, columns = ['operator_name' , 'operator_url', 'operator_region', 'transit_feeds_id', 'date_fetched', 'earliest_calendar_date', 'latest_calendar_date', 'transitland_url']) 
+        feed_info.to_csv(config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", index = False)
 
-        for gtfs_zip in gtfs_zips_to_dl:
-            print(gtfs_zip[0])
-
-            try:
-                counter = counter + 1
-                urllib.request.urlretrieve(gtfs_zip[1], config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + gtfs_zip[0] +  '-' + input_date + '_'+str(counter) + ".zip")
-                name = gtfs_zip[0]
-                dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date +'-'+ str(counter)
-                try:
-                    shutil.unpack_archive(dir_name + '.zip', dir_name)
-
-                    stops = pd.read_csv(dir_name + '/stops.txt')
-                    try:
-                        os.remove(dir_name + '/pathways.txt')
-                    except:
-                        pass
-
-
-                    for index, row in stops.iterrows():
-                        if(pd.isnull(row['stop_lat'])):
-                            stops.at[index, 'stop_lat'] = 0
-                            stops.at[index, 'stop_lon'] = 0
-
-
-                    stops.to_csv(dir_name+'/stops.txt', index = False)
-
-                    shutil.make_archive(dir_name, 'zip', dir_name)
-
-                    shutil.rmtree(dir_name)
-                except:
-
-                    shutil.rmtree(dir_name)
-                
-                
-                
-                
-                sleep(1)
-            except:
-                None
-                
     def transit_feeds(region, input_date, xmin, xmax, ymin, ymax):
         banned = pd.read_csv(config['General']['gen'] + '/banned_agencies.csv')
 
@@ -286,8 +302,22 @@ class get:
                                 stops.at[index, 'stop_lat'] = 0
                                 stops.at[index, 'stop_lon'] = 0
                         
-    
-    
+                        try:
+                            os.remove(dir_name + '/feed_info.txt')
+                        except:
+                            pass
+                        feed_txt_lst = []
+                        feed_publisher_name = name
+                        feed_publisher_url = name
+                        feed_lang = 'EN'
+                        feed_startdate = '20200101'
+                        feed_enddate = '20201201'
+                        feed_version = '1'
+                        feed_id = agencies['id']
+                        feed_txt_lst.append(list([feed_publisher_name, feed_publisher_url, feed_lang, feed_startdate, feed_enddate, feed_version, feed_id]))
+                        feed_txt = pd.DataFrame(feed_txt_lst, columns = ['feed_publisher_name' , 'feed_publisher_url', 'feed_lang', 'feed_start_date', 'feed_end_date', 'feed_version','feed_id']) 
+                        feed_txt.to_csv(dir_name+'/feed_info.txt', index = False)
+                        
                         stops.to_csv(dir_name+'/stops.txt', index = False)
                         
                         # re-save to remove leading 0s from stop_id
@@ -340,9 +370,69 @@ class get:
                 dt_end = None
                 op_url = None
 
+            shutil.unpack_archive(dir_name + '.zip', dir_name)
+
+            feed_txt_lst = []
+            feed_publisher_name = name
+            feed_publisher_url = name
+            feed_lang = 'EN'
+            feed_startdate = '20200101'
+            feed_enddate = '20201201'
+            feed_version = '1'
+            feed_id = 'virginia-railway-express/250'
+            feed_txt_lst.append(list([feed_publisher_name, feed_publisher_url, feed_lang, feed_startdate, feed_enddate, feed_version, feed_id]))
+            feed_txt = pd.DataFrame(feed_txt_lst, columns = ['feed_publisher_name' , 'feed_publisher_url', 'feed_lang', 'feed_start_date', 'feed_end_date', 'feed_version','feed_id']) 
+            feed_txt.to_csv(dir_name+'/feed_info.txt', index = False)
+            shutil.make_archive(dir_name, 'zip', dir_name)
+    
+            shutil.rmtree(dir_name)
+
+            feed_info_lst.append(list([name, op_url, loc, feed_id, dt_str, dt_st, dt_end, api_url]))
+            
+        if region == 'New York':
+
+            name = 'NICE'
+            loc = 'Nassau County'
+            dt_fetched = str(datetime.utcfromtimestamp(ts).strftime('%Y%m%d'))
+            nice_url =  'https://www.nicebus.com/NICE/media/nicebus-gtfs/NICE_GTFS.zip'
+
+                        
+            api_url = vre_url 
+            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+            urllib.request.urlretrieve(api_url, dir)
+                   
 
 
-            feed_info_lst.append(list([name, op_url, loc, 'virginia-railway-express/250', dt_str, dt_st, dt_end, api_url]))
+
+            try:          
+                gtfs_file = GTFS.load_zip(dir)
+                dt_st = str(gtfs_file.summary().first_date.date())
+                dt_end = str(gtfs_file.summary().last_date.date())
+                op_url = gtfs_file.agency['agency_url'][0]
+            except:
+                dt_st = None
+                dt_end = None
+                op_url = None
+
+            shutil.unpack_archive(dir_name + '.zip', dir_name)
+
+            feed_txt_lst = []
+            feed_publisher_name = name
+            feed_publisher_url = name
+            feed_lang = 'EN'
+            feed_startdate = '20200101'
+            feed_enddate = '20201201'
+            feed_version = '1'
+            feed_id = 'nassau-inter-county-express/268'
+            feed_txt_lst.append(list([feed_publisher_name, feed_publisher_url, feed_lang, feed_startdate, feed_enddate, feed_version, feed_id]))
+            feed_txt = pd.DataFrame(feed_txt_lst, columns = ['feed_publisher_name' , 'feed_publisher_url', 'feed_lang', 'feed_start_date', 'feed_end_date', 'feed_version','feed_id']) 
+            feed_txt.to_csv(dir_name+'/feed_info.txt', index = False)
+            shutil.make_archive(dir_name, 'zip', dir_name)
+    
+            shutil.rmtree(dir_name)
+
+
+            feed_info_lst.append(list([name, op_url, loc, feed_id, dt_str, dt_st, dt_end, api_url]))
                 
                 
         feed_info = pd.DataFrame(feed_info_lst, columns = ['operator_name' , 'operator_url', 'operator_region', 'transit_feeds_id', 'date_fetched', 'earliest_calendar_date', 'latest_calendar_date', 'transitfeeds_url']) 
@@ -451,7 +541,18 @@ class get:
                                 stops.at[index, 'stop_lat'] = 0
                                 stops.at[index, 'stop_lon'] = 0
     
-    
+                        feed_txt_lst = []
+                        feed_publisher_name = name
+                        feed_publisher_url = name
+                        feed_lang = 'EN'
+                        feed_startdate = '20200101'
+                        feed_enddate = '20201201'
+                        feed_version = '1'
+                        feed_id = agencies['id']
+                        feed_txt_lst.append(list([feed_publisher_name, feed_publisher_url, feed_lang, feed_startdate, feed_enddate, feed_version, feed_id]))
+                        feed_txt = pd.DataFrame(feed_txt_lst, columns = ['feed_publisher_name' , 'feed_publisher_url', 'feed_lang', 'feed_start_date', 'feed_end_date', 'feed_version','feed_id']) 
+                        feed_txt.to_csv(dir_name+'/feed_info.txt', index = False)
+                        
                         stops.to_csv(dir_name+'/stops.txt', index = False)
     
                         shutil.make_archive(dir_name, 'zip', dir_name)
@@ -488,7 +589,7 @@ class get:
 
             dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
             urllib.request.urlretrieve(api_url, dir)
-                   
+            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
 
 
 
@@ -501,10 +602,25 @@ class get:
                 dt_st = None
                 dt_end = None
                 op_url = None
+            
+            shutil.unpack_archive(dir_name + '.zip', dir_name)
 
+            feed_txt_lst = []
+            feed_publisher_name = name
+            feed_publisher_url = name
+            feed_lang = 'EN'
+            feed_startdate = '20200101'
+            feed_enddate = '20201201'
+            feed_version = '1'
+            feed_id = 'virginia-railway-express/250'
+            feed_txt_lst.append(list([feed_publisher_name, feed_publisher_url, feed_lang, feed_startdate, feed_enddate, feed_version, feed_id]))
+            feed_txt = pd.DataFrame(feed_txt_lst, columns = ['feed_publisher_name' , 'feed_publisher_url', 'feed_lang', 'feed_start_date', 'feed_end_date', 'feed_version','feed_id']) 
+            feed_txt.to_csv(dir_name+'/feed_info.txt', index = False)
+            shutil.make_archive(dir_name, 'zip', dir_name)
+    
+            shutil.rmtree(dir_name)
 
-
-            feed_info_lst.append(list([name, op_url, loc, 'virginia-railway-express/250', dt_str, dt_st, dt_end, api_url]))
+            feed_info_lst.append(list([name, op_url, loc, feed_id, dt_str, dt_st, dt_end, api_url]))
                 
                 
         feed_info = pd.DataFrame(feed_info_lst, columns = ['operator_name' , 'operator_url', 'operator_region', 'transit_feeds_id', 'date_fetched', 'earliest_calendar_date', 'latest_calendar_date', 'transitfeeds_url']) 

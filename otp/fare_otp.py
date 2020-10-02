@@ -42,7 +42,7 @@ threads = int(args.threads)
 #lowcost = args.lowcost
 period = args.period
 
-lowcost = True
+
 
 config = configparser.ConfigParser()
 
@@ -58,18 +58,16 @@ outpath = config[region]['itinerary']
 graph_path = config[region]['graphs']
 otp_path = config['General']['otp']
 
-if lowcost == True:
-    #reads the list of premium routes to ban
-    results = []
-    with open(config[region]['gtfs_static'] + '/premium_routes.csv' , newline='') as f:
-        for row in csv.reader(f):
-            results.append(row[0])
-    premium_routes = ','.join(results)
-    #premium_routes = results
-    mode = 'TRANSIT'
-else:
-    mode = 'TRANSIT'
-    premium_routes = None
+
+#reads the list of premium routes to ban
+results = []
+with open(config[region]['gtfs_static'] + '/premium_routes.csv' , newline='') as f:
+    for row in csv.reader(f):
+        results.append(row[0])
+premium_routes = ','.join(results)
+#premium_routes = results
+mode = 'TRANSIT'
+
 
 # shell command to start up otp server
 def call_otp():
@@ -91,7 +89,33 @@ def return_itineraries(ox,oy,dx,dy,date_us,hr,minute):
     options = {
    		'fromPlace': str(oy) + ", " + str(ox),
    		'toPlace': str(dy) + ", " + str(dx),
-   		'time': str(hr)+':' + minute + 'am',
+   		'time': str(hr)+':' + minute,
+   		'date': date_us,
+   		'mode': mode+',WALK',
+   		'maxWalkDistance':5000,
+   		'clampInitialWait':0,
+   		'wheelchair':False,
+   		#'batch': True,
+   		'numItineraries': 1
+   	}
+   
+   	# send to server and get data
+    response = requests.get(
+   		"http://localhost:8080/otp/routers/default/plan",
+   		params = options
+           )
+    # return as json
+    data = json.loads(response.text)
+    return data
+
+# function to return the lowcost itineraries
+def return_lowcost(ox,oy,dx,dy,date_us,hr,minute):
+
+	# parameters
+    options = {
+   		'fromPlace': str(oy) + ", " + str(ox),
+   		'toPlace': str(dy) + ", " + str(dx),
+   		'time': str(hr)+':' + minute,
    		'date': date_us,
    		'mode': mode+',WALK',
    		'maxWalkDistance':5000,
@@ -136,12 +160,21 @@ if __name__ == '__main__':
 
     # load in the point file
     df_pts = pd.read_csv(pts_path)
-    output_lst = []
     
-    columns = ['origin_tract', 'destination_tract', 'departure_datetime', 'period', 'low_cost', 'fare', 'travel_time']
+    #declaring variables
+    output_lst = []
+    fare_lst = []
+    fare_error = []
+    error_json = []
+    full_json = []
+    output_lst_lowcost = []
+    
+    columns = ['origin_tract', 'destination_tract', 'fare_all', 'travel_time_all']
+    columns_lowcost = ['origin_tract', 'destination_tract', 'fare_lowcost', 'travel_time_lowcost']
+
     
     # configuring the period for the time bins
-    if period == 'AM':
+    if period == 'MP':
         dt = datetime.datetime.strptime(date, '%Y-%m-%d')
         while True:
             if dt.weekday() > 4:
@@ -151,7 +184,7 @@ if __name__ == '__main__':
                 break
         hr_lst = [7,8]
         
-    elif period == 'MID':
+    elif period == 'WE':
         dt = datetime.datetime.strptime(date, '%Y-%m-%d')
         while True:
             if dt.weekday() < 5:
@@ -161,7 +194,7 @@ if __name__ == '__main__':
                 break
         hr_lst = [10,11]
         
-    elif period == 'EVE':
+    elif period == 'PM':
         dt = datetime.datetime.strptime(date, '%Y-%m-%d')
         while True:
             if dt.weekday() > 4:
@@ -183,7 +216,6 @@ if __name__ == '__main__':
     gdf_pts = gpd.GeoDataFrame(df_pts, geometry=gpd.points_from_xy(df_pts.LONGITUDE, df_pts.LATITUDE))
 
     #setting up the structure for the error json
-    error_json = []
     error_dict = {
     	'origin_tract': "",
     	'destination_tract': "",
@@ -251,7 +283,9 @@ if __name__ == '__main__':
             
             thread_lst = []
             result = []
-
+            thread_lst_lowcost = []
+            result_lowcost = []
+            
             # parralelizing the otp plan call
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for i in range(threads):
@@ -261,6 +295,16 @@ if __name__ == '__main__':
                 for f in concurrent.futures.as_completed(thread_lst):
                     # retrieving the information from each thread for the otp call
                     result.append(f.result())
+            
+            #lowcost network calculations
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for i in range(threads):
+                    thread_lst_lowcost.append(executor.submit(return_lowcost, param[i][0],  param[i][1],  param[i][2],  param[i][3], 
+                                                      param[i][4], param[i][5], param[i][6]))
+                    
+                for f in concurrent.futures.as_completed(thread_lst_lowcost):
+                    # retrieving the information from each thread for the otp call
+                    result_lowcost.append(f.result())
                     
             start = start + threads
             
@@ -281,17 +325,18 @@ if __name__ == '__main__':
                         if dest_lst[j] == 0:
                             continue
                         
-                        output_lst.append([origin, dest_lst[j], str(tm), period,lowcost, fare_cost, result[j]['plan']['itineraries'][0]['duration']])
+                        output_lst.append([origin, dest_lst[j], fare_cost, result[j]['plan']['itineraries'][0]['duration']])
 
-                        error_data = error_dict 
-                        error_data['origin_tract'] = origin
-                        error_data['destination_tract'] = dest_lst[j]
-                        error_data['departure_datetime'] = str(tm)
-                        error_data['fare_dict'] = result[j]['plan']
-                        error_data['traceback'] = traceback.format_exc()
+                        full = error_dict 
+                        full['origin_tract'] = origin
+                        full['destination_tract'] = dest_lst[j]
+                        full['departure_datetime'] = str(tm)
+                        full['fare_dict'] = fare_dict
+                        full['traceback'] = traceback.format_exc()
                         
-                        error_json.append(error_data)
-                
+                        full_json.append(dict(full))
+                        full = ""
+                        fare_lst.append(fare_dict)
 
 
                     except:
@@ -299,29 +344,78 @@ if __name__ == '__main__':
                         error_data['origin_tract'] = origin
                         error_data['destination_tract'] = dest_lst[j]
                         error_data['departure_datetime'] = str(tm)
-                        error_data['fare_dict'] = result[j]['plan']
+                        error_data['fare_dict'] = fare_dict
                         error_data['traceback'] = traceback.format_exc()
                         
-                        error_json.append(error_data)
+                        error_json.append(dict(error_data))
+                        error_data = ""
+                        fare_error.append(fare_dict)
+           
                 
-            
+                #low cost network 
+                if 'plan' in result_lowcost[j].keys():
+                    
+                    fare_dict = {
+                      "OTP_itinerary_all": result_lowcost[j]
+                    }
+                    
+                    try:
+                        #calling the fare values, otherwise it will append to traceback
+                        fare_cost = fare.fare(fare_dict, region)
+                        if dest_lst[j] == 0:
+                            continue
+                        
+                        output_lst_lowcost.append([origin, dest_lst[j], fare_cost, result_lowcost[j]['plan']['itineraries'][0]['duration']])
+
+                        full = error_dict 
+                        full['origin_tract'] = origin
+                        full['destination_tract'] = dest_lst[j]
+                        full['departure_datetime'] = str(tm)
+                        full['fare_dict'] = fare_dict
+                        full['traceback'] = traceback.format_exc()
+                        
+                        full_json.append(dict(full))
+                        full = ""
+                        fare_lst.append(fare_dict)
 
 
+                    except:
+                        error_data = error_dict 
+                        error_data['origin_tract'] = origin
+                        error_data['destination_tract'] = dest_lst[j]
+                        error_data['departure_datetime'] = str(tm)
+                        error_data['fare_dict'] = fare_dict
+                        error_data['traceback'] = traceback.format_exc()
+                        
+                        error_json.append(dict(error_data))
+                        error_data = ""
+                        fare_error.append(fare_dict)
 
+
+    os.makedirs(outpath + '/' + 'fares', exist_ok=True)
+    os.makedirs(outpath + '/fares' + '/' + str(date_us), exist_ok=True)
+    
+    df_path = outpath + '/fares' + '/' + str(date_us) 
+    
     end_time = time.time()
 
     # write to csv
     output = pd.DataFrame(output_lst, columns = columns)
-    output.to_csv(outpath+'/'+region+'_'+period+'_'+mode+'_'+date+'test.csv', index = False)
-
+    output_lowcost = pd.DataFrame(output_lst_lowcost, columns = columns_lowcost)
+    
+    fare_df = pd.merge(output, output_lowcost, on = ['origin_tract', 'destination_tract'], how = 'outer')
+    fare_df.to_csv(df_path + '/' + 'period_' + period + '.csv', index = False)
+    
     #writing the error json
     if len(error_json) >= 1:
         print('Some fares could not be calculated. See the error file.')
-        error_path = outpath+'/MissingFare_'+region+'_'+period+'_'+mode+'_'+date + '.json'
+        error_path = df_path+'/missing_fare' + '.json'
         with open(error_path, 'w') as f:
             json.dump(error_json, f)
 
-
+    full_path = df_path+'/full' + '.json'
+    # with open(full_path, 'w') as f:
+    #     json.dump(full_json, f)
     print(len(output))
     
     print(end_time - start_time)
