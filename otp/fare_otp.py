@@ -14,13 +14,15 @@ from datetime import timedelta
 from subprocess import Popen, call
 import subprocess
 import sys
-import time
 import os
 import traceback
 import csv
+import sqlite3
 
 from pathlib import Path
 root_path = Path(os.getcwd())
+fare_path = str(Path(os.getcwd()).parent) + '/fare'
+
 
 sys.path.insert(1, str(root_path.parent)+'/fare')
 import fare
@@ -32,14 +34,12 @@ parser.add_argument("-d", '--date', default = datetime.datetime.now().strftime('
 parser.add_argument("-r", '--region',  help="Region to evaluate")
 parser.add_argument("-p", '--threads', default = 5, help="number of threads")
 parser.add_argument("-z", '--period', help="time period, AM, EVE, MID")
-#parser.add_argument("-b", '--lowcost', default=False, action='store_true', help="if evaluating a premium network")
 
 args = parser.parse_args()
 
 date = args.date
 region = args.region
 threads = int(args.threads)
-#lowcost = args.lowcost
 period = args.period
 
 
@@ -66,7 +66,8 @@ with open(config[region]['gtfs_static'] + '/premium_routes.csv' , newline='') as
         results.append(row[0])
 premium_routes = ','.join(results)
 #premium_routes = results
-mode = 'TRANSIT'
+mode = 'RAIL'
+# mode = 'TRANSIT'
 
 
 # shell command to start up otp server
@@ -155,6 +156,11 @@ if __name__ == '__main__':
     # ensuring parrallel processing works on mac os
     __spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
     start_time = time.time()
+    
+    # connect to database
+    DB_NAME = fare_path + '/FareDB.db'
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
     
     p = call_otp()
 
@@ -321,7 +327,7 @@ if __name__ == '__main__':
                     
                     try:
                         #calling the fare values, otherwise it will append to traceback
-                        fare_cost = fare.fare(fare_dict, region)
+                        fare_cost = fare.fare(fare_dict, region, c)
                         if dest_lst[j] == 0:
                             continue
                         
@@ -361,7 +367,7 @@ if __name__ == '__main__':
                     
                     try:
                         #calling the fare values, otherwise it will append to traceback
-                        fare_cost = fare.fare(fare_dict, region)
+                        fare_cost = fare.fare(fare_dict, region, c)
                         if dest_lst[j] == 0:
                             continue
                         
@@ -414,11 +420,13 @@ if __name__ == '__main__':
             json.dump(error_json, f)
 
     full_path = df_path+'/full' + '.json'
-    # with open(full_path, 'w') as f:
-    #     json.dump(full_json, f)
+    with open(full_path, 'w') as f:
+        json.dump(full_json, f)
     print(len(output))
     
     print(end_time - start_time)
+    
+    conn.close()
     
     p.kill() # making sure the server shuts down
     sys.exit()
