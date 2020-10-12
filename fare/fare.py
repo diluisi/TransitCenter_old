@@ -469,7 +469,7 @@ def fare(jsn, region, c):
                     next_route_id           = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['routeId'].split(':')[1] #ok
                     next_stop_id            = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['to']['stopId'].split(':')[1] #ok
                     leg_duration            = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['duration']
-                    distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[0]]['distance']
+                    distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['distance']
 
                 else: # last leg index
                     previous_agency_id      = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['agencyId'] #ok
@@ -477,13 +477,13 @@ def fare(jsn, region, c):
                     previous_route_type     = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['routeType'] #ok
                     previous_route_id       = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['routeId'].split(':')[1] #ok
                     previous_stop_id        = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['from']['stopId'].split(':')[1] #ok
-                    distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[0]]['distance']
+                    distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['distance']
                     if previous_route_type == 2: #if last leg is rail we need destination data
                         next_agency_id          = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['agencyId'] #ok
                         next_route_type         = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['routeType'] #ok
                         next_route_id           = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['routeId'].split(':')[1] #ok
                         next_stop_id            = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['to']['stopId'].split(':')[1] #ok
-                        distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[0]]['distance']
+                        distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['distance']
                 # if flag is 0 means that we didn't use rules and we can go on to calculate fare for current leg index
                 if flag == 0:
                     # verify if is the last item in the list

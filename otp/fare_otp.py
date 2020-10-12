@@ -65,9 +65,8 @@ with open(config[region]['gtfs_static'] + '/premium_routes.csv' , newline='') as
     for row in csv.reader(f):
         results.append(row[0])
 premium_routes = ','.join(results)
-#premium_routes = results
-mode = 'RAIL'
-# mode = 'TRANSIT'
+# mode = 'RAIL'
+mode = 'TRANSIT'
 
 
 # shell command to start up otp server
@@ -140,7 +139,7 @@ def return_lowcost(ox,oy,dx,dy,date_us,hr,minute):
 def analyst(x, y):
 
     # calling isochrones to filter out tracts
-    bins = [7200]
+    bins = [5400] #90 minute transit travel time
     cutoff = f'&cutoffSec={bins[0]}'
     tm = str(hr)+':%20' + minute + 'am'
     walk_dist = 5000
@@ -255,12 +254,13 @@ if __name__ == '__main__':
         
         dest_lst = []
         start = 0
-        print(index)
+        # for testing purposes, running a limited set
         # if index == 5:
         #     break
         for index2, row2 in df_120.groupby(df_120.index // threads):
             
-            print(index2)
+            print(index, index2)
+            # for testing purposes, running a limited set
             # if index2 == 50:
             #     break
             
@@ -358,7 +358,7 @@ if __name__ == '__main__':
                         fare_error.append(fare_dict)
            
                 
-                #low cost network 
+                # low cost network 
                 if 'plan' in result_lowcost[j].keys():
                     
                     fare_dict = {
@@ -408,6 +408,7 @@ if __name__ == '__main__':
     # write to csv
     output = pd.DataFrame(output_lst, columns = columns)
     output_lowcost = pd.DataFrame(output_lst_lowcost, columns = columns_lowcost)
+    # output.to_csv(df_path + '/' + 'period_' + period + '.csv', index = False)
     
     fare_df = pd.merge(output, output_lowcost, on = ['origin_tract', 'destination_tract'], how = 'outer')
     fare_df.to_csv(df_path + '/' + 'period_' + period + '.csv', index = False)
@@ -419,6 +420,7 @@ if __name__ == '__main__':
         with open(error_path, 'w') as f:
             json.dump(error_json, f)
 
+    #outputing the entire json of the itineraries for testing purposes
     full_path = df_path+'/full' + '.json'
     with open(full_path, 'w') as f:
         json.dump(full_json, f)
