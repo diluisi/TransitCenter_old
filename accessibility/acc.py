@@ -1125,6 +1125,9 @@ def auto_accessibility(region, input_matrix):
 
 def auto_accessibility_join(region):
 
+    """
+    takes chunks of auto accessibility results and combines them into a single files
+    """
 
 
     data_dir = "data/" + region + "/input/auto_travel_times/accessibility_chunks_AM"
