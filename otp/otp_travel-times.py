@@ -86,7 +86,6 @@ for origin in points:
     r.setOrigin(origin) # set origin
     
     if suffix == 'lowcost':
-        print(lowcost)
         r.setBannedRoutes(lowcost) #banning premium routes if any
     # r.setWalkSpeedMs() #speed of pedestrian
     # r.setWheelchairAccessible()
@@ -99,6 +98,7 @@ for origin in points:
             csv_all.addRow( [origin.getStringData('GEOID'), r.getIndividual().getStringData('GEOID'), r.getTime()] )
     except:
         continue
+    print(i)
 
 
     # for testing purposes, limits number of iterations

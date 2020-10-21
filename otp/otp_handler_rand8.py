@@ -54,7 +54,8 @@ else:
     config.read('../config.cfg')
 
 #reading paths from the config
-pts_path = config[region]['block_group_points'] 
+#pts_path = config[region]['block_group_points'] 
+pts_path = config[region]['tract_points'] 
 graph_path = config[region]['graphs'] 
 otp_path = config['General']['otp'] 
 outpath = config[region]['itinerary']
@@ -102,7 +103,7 @@ if __name__ == '__main__':
     
     # converting the periods into dates and times
     # if run date falls on weekday/weekend, then it will look for the next weekend/weekday
-    if period == 'AM':
+    if period == 'MP':
         dt = datetime.datetime.strptime(date, '%Y-%m-%d')
         while True:
             if dt.weekday() > 4:
@@ -112,7 +113,7 @@ if __name__ == '__main__':
                 break
         hr_lst = [7,8]
     
-    elif period == 'MID':
+    elif period == 'WE':
         dt = datetime.datetime.strptime(date, '%Y-%m-%d')
         while True:
             if dt.weekday() < 5:
@@ -122,7 +123,7 @@ if __name__ == '__main__':
                 break
         hr_lst = [10,11]
         
-    elif period == 'EVE':
+    elif period == 'PM':
         dt = datetime.datetime.strptime(date, '%Y-%m-%d')
         while True:
             if dt.weekday() > 4:
