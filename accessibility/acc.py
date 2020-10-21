@@ -1,9 +1,13 @@
 
 
-
+import os
+import datetime
 import pandas as pd
 import numpy as np
-import os
+import geopandas as gpd
+from shapely.geometry import Point
+import swifter
+from gtfslite import GTFS
 import tracc
 import time
 
@@ -25,99 +29,785 @@ def get_nexp_beta(in_param, in_region):
 
 
 
-def transit_accessibility(region):
+
+def levelofservice(region, gtfs_date):
+
+    '''
+    Computes weekly transit level of service for block groups
+
+    gtfs_date: as string in "YYYY-MM-DD" format
+    region: string of region name, e.g. "Boston"
+    '''
+
+    start_time = time.time()
+
+    # distance to buffer each zone (could be a function parameter)
+    distance = 200
+
+    # input paths
+    block_group_poly = "data/" + region + "/input/boundary_data/block_group_poly.geojson"
+
+    # static GTFS folder
+    gtfs_folder = "data/" + region + "/input/gtfs/gtfs_static/feeds_" + gtfs_date
+
+    # output_file_path
+    output_file_path = "data/" + region + "/output/" + "measures_" + gtfs_date + "_" + "LOS" + ".csv"
+
+    # output measure name
+    output_measure_name = "los_trips_" + str(gtfs_date)
+    print(output_measure_name)
+
+
+    # get a list the 7 dates for analysis
+    gtfs_date = datetime.datetime.strptime(gtfs_date, '%Y-%m-%d')
+    dates = []
+    i = 0
+    while i < 7:
+        date = gtfs_date.date() - datetime.timedelta(days=i)
+        dates.append(date)
+        i += 1
+
+    # crs dictionary needed for polygon buffering
+    crs = {
+        "Boston": 'epsg:32619',
+        "New York": 'epsg:32618',
+        "District of Columbia": 'epsg:32618',
+        "Philadelphia": 'epsg:32618',
+        "Chicago": 'epsg:32616',
+        "Los Angeles": 'epsg:32611',
+        "San Francisco-Oakland": 'epsg:32610',
+    }
+
+    # buffering the polygon file
+    gdf = gpd.read_file(block_group_poly)
+    gdf.crs = {'init' :'epsg:4326'}
+    gdf = gdf.to_crs({'init': crs[region]})
+    gdf["geometry"] = gdf["geometry"].buffer(distance, resolution=16)
+    gdf = gdf.to_crs({'init': 'epsg:4326'})
+
+    # getting a simple dataframe of all census block groups, this is for merging data to at the end
+    blocks = gdf[["GEOID"]]
+
+    # function for getting the number of trips for a block group
+    def trips_by_block(geoid,gtfs_in,stops_geoid_in,date_in):
+        stops_geoid_in = stops_geoid_in[stops_geoid_in["GEOID"] == geoid]
+        stop_list = stops_geoid_in["stop_id"].to_list()
+        trips_at_stops_temp = gtfs_in.trips_at_stops(stop_list, date_in)
+        n_trips = len(trips_at_stops_temp.index)
+        return n_trips
+
+    # empty output list
+    output = []
+
+    # loop over GTFS files
+    for filename in os.listdir(gtfs_folder):
+        if filename.endswith(".zip"):
+            gtfs_path = os.path.join(gtfs_folder, filename)
+            print(gtfs_path)
+
+            try:
+                # loading in the GTFS data
+                gtfs = GTFS.load_zip(gtfs_path)
+
+                # converting the stops file into a geopandas point dataframe
+                stops_geometry = [Point(xy) for xy in zip(gtfs.stops.stop_lon, gtfs.stops.stop_lat)]
+                stops_gdf = gtfs.stops.drop(['stop_lon', 'stop_lat'], axis=1)
+                stops_gdf = gpd.GeoDataFrame(stops_gdf, crs="EPSG:4326", geometry=stops_geometry)
+
+                # spatial join block group to stop points
+                stops_geoid = gpd.sjoin(stops_gdf, gdf, op="within")[["stop_id","GEOID"]]
+
+                # getting a unique list of block groups that have stops
+                unique_geoid = pd.DataFrame(stops_geoid.GEOID.unique(), columns = ["GEOID"])
+
+                # looping over the 7 dates
+                for date in dates:
+
+                    # compute number of trips per block group, usinig the above function, and applied for each block group
+                    unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
+
+                    output.append(unique_geoid)
+
+                print("SUCCESS")
+
+            except:
+                print("FAILED")
+
+            print(time.time() - start_time)
+
+
+    # creating single dataframe for all outupts
+    output = pd.concat(output)
+
+    # group by block group, summing total trips
+    output = output.groupby(['GEOID']).sum()
+
+    # merging data to the total set of block groups
+    output = blocks.merge(output,how="outer",on="GEOID")
+
+    # filling in 0 to block groups without transit
+    output = output.fillna(0)
+
+    # updating column names
+    output.columns = ["GEOID","value"]
+
+    # add column for measure name
+    output["measure"] = output_measure_name
+
+    # saving output
+    output.to_csv(output_file_path, index = False)
+
+
+
+
+
+
+
+def transit_accessibility(region, date, period):
     '''
     computes all transit accessibility measures for our study for a study region for a single week
     i.e. this will have to be repeated weekly
     '''
 
+    # <dest>_<measure>_<param>_<period>_<autoFlag>_<fareFlag>_<date>
+
+    # autoY autoN
+    # fareY fareN
+
+    # make sure the data directory is as follows
+    #
+    # data
+    # --region
+    # ----input
+    # ------boundary_data
+    # --------block_group_poly.geojson
+    # --------block_group_pts.csv
+    # ------destination_data
+    # --------employment.csv
+    # --------groceries_snap.sv
+    # --------healthcare.csv
+    # --------education.csv
+    # --------greenspace.csv
+
+    start_time = time.time()
 
     # get complete list of block groups
     dfo = pd.read_csv("data/" + region + "/input/boundary_data/" + "block_group_pts.csv")
     dfo = dfo[["GEOID"]]
 
+    # get path to spatial boundaries of block groups
+    spatial_boundaries = "data/" + region + "/input/boundary_data/" + "block_group_poly.geojson"
+
+
+    # get intrazonal times, for appending to travel time matrix later on
+    dfint = dfo
+    from tracc.spatial import radius
+    radius_poly = radius(
+        spatial_data_file_path = spatial_boundaries,
+        id_field = "GEOID"
+    )
+    radius_poly["GEOID"] = radius_poly["GEOID"].astype(int)
+    dfint = dfint.merge(radius_poly, on = "GEOID")
+    del radius_poly
+    dfint["o_block"] = dfint["GEOID"]
+    dfint["d_block"] = dfint["GEOID"]
+    del dfint['GEOID']
+    dfint["fare_all"] = 0
+    dfint["fare_lowcost"] = 0
+    dfint["time_all"] = dfint["radius"] / 0.1
+    dfint["time_lowcost"] = dfint["time_all"]
+    del dfint["radius"]
+
+
+    # get fare threshold
+    acc_config_region = pd.read_csv('accessibility/acc_config_regional.csv')
+    acc_config_region = acc_config_region[acc_config_region["region"] == region]
+    fare_threshold = float(acc_config_region["fare_threshold"])
+
+
+    # getting a neighbourds matrix
+    from tracc.spatial import get_neighbours
+    neighbours = get_neighbours(
+        spatial_data_file_path = spatial_boundaries,
+        weight_type = "KNN",
+        idVariable = "GEOID",
+        param = 10
+    )
 
     # load in supply data
-    for dataset in ["groceries_snap.csv","healthcare.csv","education.csv","greenspace.csv","employment.csv"]:
+    dftemp = pd.read_csv("data/" + region + "/input/destination_data/employment.csv")
+    dfo = pd.merge(dfo,dftemp, how='left', left_on="GEOID", right_on="block_group_id")
+    for dataset in ["groceries_snap.csv","healthcare.csv","education.csv","greenspace.csv"]:
         dftemp = pd.read_csv("data/" + region + "/input/destination_data/" + dataset)
         dfo = pd.merge(dfo,dftemp, how='left', left_on="GEOID", right_on="GEOID")
     del dftemp
     dfo["schools"] = dfo["count"]
-    dfo["greenspace"] = dfo["area"]
+    dfo["parks"] = dfo["area"] * 247.10538161 # from km2 to acres
     dfo["urgentcare"] = dfo["urgent_care_facilities"]
     del dfo["count"], dfo["area"], dfo["urgent_care_facilities"]
     dfo = dfo.fillna(0)
 
 
     # loading in the accessibility config file
-    with open('accessibility/acc_config.json', 'r') as myfile:
-        accessibility_config=myfile.read()
-    # parse file
-    accessibility_config = json.loads(accessibility_config)
+    acc_config = pd.read_csv('accessibility/acc_config.csv')
+    destination_types = list(acc_config.destination.unique())
 
+    # unique impedence to compute
+    impedences_times = acc_config[acc_config["type_code"] != "M"]
+    impedences_times =  impedences_times[["function_name","function","cost","params","fare"]]
+    impedences_times = impedences_times.drop_duplicates()
 
-    # get a unique lists of destinations and impedences
-    destinations = []
-    impedences = []
-    for a in accessibility_config["measures"]:
-        if a["destination"] not in destinations:
-            destinations.append(a["destination"])
-        if a["impedence"] not in impedences:
-            impedences.append(a["impedence"])
+    print(impedences_times)
 
+    # access_measures
+    access_measures = acc_config
 
     # create the supply object
     dfo = tracc.supply(
         supply_df = dfo,
-        columns = ["GEOID"] + destinations
+        columns = ["GEOID"] + destination_types
     )
 
 
-    #
-    dfa = []
+    # chunking the origins
+    geoids = dfo.data["GEOID"].to_list()
+    n_chunks = 2000
+    def chunks(lst,n):
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+    geoid_chunks = list(chunks(geoids,n_chunks))
+
+
+    start_time = time.time()
+
+
+    # setting the periods for input and output
+    period_times = period
+    period_access = period
+    if period_access == "MP":
+        period_access = "AM"
+
+    # load in the fares data for this time period
+    dff = pd.read_csv("data/" + region + "/otp/itinerary/fares/period_" + period_times + ".csv")
+    dff = dff[["o_block","d_block","fare_all","fare_lowcost"]]
+
+    # creating the output dataframe
+    dfout_P = pd.DataFrame(columns=['GEOID', 'measure', 'value'])
+    dfout_M = pd.DataFrame(columns=['GEOID', 'measure', 'value'])
+
+    # loop over the 8 times
+    i = 0
+    directory = "data/" + region + "/otp/itinerary/travel_times/" + date + "/period" + period_times + "/"
+    for filename in os.listdir(directory):
+        if filename.endswith(".csv"):
+
+            travel_time_matrix = os.path.join(directory, filename)
+            i += 1
+
+            # read in the travel time matrix
+            dftall = pd.read_csv(travel_time_matrix)
+
+            # looping over chunks
+            i = 0
+            while i < len(geoid_chunks):
+
+                print(i, " -- ", start_time - time.time())
+
+                # get the geoids for this chunk
+                geoids = geoid_chunks[i]
+
+                # subset the full matrix by this set of geoids
+                dft = dftall[dftall.o_block.isin(geoids)]
+
+                # filling Na values with a large travel time
+                dft = dft.fillna(9999)
+
+                # if by chance the lowcost is a shorter travel time, set it to be the time_all time
+                dft['time_all'] = dft[['time_all','time_lowcost']].min(axis=1)
+
+                # subsetting the data to only have times less than 90 min
+                dft = dft[dft["time_all"] < 5400]
+
+                # removing existing intrazonal times
+                dft = dft[dft["o_block"] != dft["d_block"]]
+
+                # merge in fares
+                dft = dft.merge(dff, how='left', on=['o_block','d_block'])
+
+
+                # change to dollars if not already here
+
+                # take any NA values for fares, and apply a very high fare
+                df['fare_all'] = df['fare_all'].fillna(99)
+                df['fare_lowcost'] = df['fare_lowcost'].fillna(99)
 
 
 
-    # begin loop for three time periods here
+                # filling in missing costs, at the origin:
 
-        # load in the fares data for this time period
+                li1 = list(dft['o_block'].unique())
+                li2 = geoids
+                missing = [x for x in li2 if x not in li1]
 
-        # accessibility output for time period
+                # for extra_missing in also_missing:
+                #     if extra_missing in geoids:
+                #         missing.append(extra_missing)
 
-        # loop over the 8 times
+                if len(missing) >= 1:
 
-            # load in the travel time data for this time period
+                    dft = dft[~dft['o_block'].isin(missing)]
 
-            # remove intrazonal
+                    new_times = []
 
-            # fill in missing
+                    # for each zone, compute average travel times to other zones based on neighbours
+                    for location in missing:
 
-            # compute intrazonal
+                        locneigh = neighbours[str(location)]
 
-            # merge with fares, join left with travel times
+                        temp = dft[dft['o_block'].isin(locneigh)]
 
-            # loop over impedences
+                        temp = pd.DataFrame(temp.groupby(['d_block'], as_index=False)['time_all','time_lowcost','fare_all','fare_lowcost'].mean())
 
-                # compute impedences
+                        temp['o_block'] = str(location)
 
-                # gen max impedence to reduce
+                        new_times.append(temp)
 
-            # create accessibility object
+                    # combine the outputs, and concat to the input times
+                    new_times = pd.concat(new_times)
 
-            # loop over types of accessibility
+                    dft = pd.concat([dft, new_times])
 
-                # compute accessibility
+                    # max value just in access_measures
+                    dft = dft.groupby(["o_block","d_block"])['time_all','time_lowcost','fare_all','fare_lowcost'].max().reset_index()
 
-        # generate mean accessibility
+                    del new_times
+                    del temp
+                    del locneigh
+                del li1
+                del li2
+                del missing
 
-        # output to dfa
+
+                # filling in missing costs, at the destination:
+
+                li1 = list(dft['d_block'].unique())
+                li2 = geoids
+                missing = [x for x in li2 if x not in li1]
+
+                # for extra_missing in also_missing:
+                #     if extra_missing in geoids:
+                #         missing.append(extra_missing)
+
+                if len(missing) >= 1:
+
+                    dft = dft[~dft['d_block'].isin(missing)]
+
+                    new_times = []
+                    for location in missing:
+
+                        locneigh = neighbours[str(location)]
+
+                        temp = dft[dft['d_block'].isin(locneigh)]
+
+                        temp = pd.DataFrame(temp.groupby(['o_block'], as_index=False)['time_all','time_lowcost','fare_all','fare_lowcost'].mean())
+
+                        temp['d_block'] = str(location)
+
+                        new_times.append(temp)
+
+                    # # combine the outputs, and concat to the input times
+                    new_times = pd.concat(new_times)
+                    dft = pd.concat([dft, new_times])
+
+                    # max value just in access_measures
+                    dft = dft.groupby(["o_block","d_block"])['time_all','time_lowcost','fare_all','fare_lowcost'].max().reset_index()
+
+                    del new_times
+                    del temp
+                    del locneigh
+                del li1
+                del li2
+                del missing
+
+                # removing existing intrazonal times
+                dft = dft[dft["o_block"] != dft["d_block"]]
+
+
+                # convert time to minutes
+                dft["time_all"] = dft["time_all"] / 60
+                dft["time_all"] = dft["time_all"].round(1)
+                dft["time_lowcost"] = dft["time_lowcost"] / 60
+                dft["time_lowcost"] = dft["time_lowcost"].round(1)
+
+                # # add in pre-computed intrazonal times
+                dfint_sub = dfint[dfint.o_block.isin(geoids)]
+                dft = pd.concat([dft,dfint_sub])
+
+
+                # convert to a tracc costs object
+                dft = tracc.costs(dft)
+
+
+                # calc base fare impedence, i.e. removing
+                dft.impedence_calc(
+                    cost_column = "fare_all",
+                    impedence_func = "cumulative",
+                    impedence_func_params = fare_threshold,
+                    output_col_name = "fare_all_cum",
+                    prune_output = False
+                )
+                dft.impedence_calc(
+                    cost_column = "fare_lowcost",
+                    impedence_func = "cumulative",
+                    impedence_func_params = fare_threshold,
+                    output_col_name = "fare_lowcost_cum",
+                    prune_output = False
+                )
+
+                # create a time field for mintraveltime measures with a fare threshold
+                dft.data["temp1"] = dft.data["time_all"] * dft.data["fare_all_cum"]
+                dft.data["temp1"] = dft.data["temp1"].replace(0, 999)
+                dft.data["temp2"] = dft.data["time_lowcost"] * dft.data["fare_lowcost_cum"]
+                dft.data["temp2"] = dft.data["temp2"].replace(0, 999)
+                dft.data["time_for_min_lowcost"] = dft.data[["temp1","temp2"]].max(axis=1)
+                del dft.data["temp1"]
+                del dft.data["temp2"]
+
+
+                # loop over acc config file, computing all impedences
+                impedence_fare_names = []
+                for index, row in impedences_times.iterrows():
+
+                    if row["fare"] == 0:
+
+                        impedence_fare_name = row["function_name"] + "_fareN"
+
+                        if impedence_fare_name not in impedence_fare_names:
+
+                            impedence_fare_names.append(impedence_fare_name)
+
+                            if row["function"] == "cumulative":
+                                theta = float(row["params"])
+                                dft.impedence_calc(
+                                    cost_column = "time_all",
+                                    impedence_func = row["function"],
+                                    impedence_func_params = theta,
+                                    output_col_name = impedence_fare_name,
+                                    prune_output = False
+                                )
+                            elif row["function"] == "exponential":
+                                beta = get_nexp_beta(row["params"],region)
+                                dft.impedence_calc(
+                                    cost_column = "time_all",
+                                    impedence_func = row["function"],
+                                    impedence_func_params = beta,
+                                    output_col_name = impedence_fare_name,
+                                    prune_output = False
+                                )
+                            else:
+                                None
+
+                    elif row["fare"] == 1:
+
+                        impedence_fare_name = row["function_name"] + "_fareN"
+
+                        if impedence_fare_name not in impedence_fare_names:
+
+                            impedence_fare_names.append(impedence_fare_name)
+
+                            if row["function"] == "cumulative":
+                                theta = float(row["params"])
+                                dft.impedence_calc(
+                                    cost_column = "time_all",
+                                    impedence_func = row["function"],
+                                    impedence_func_params = theta,
+                                    output_col_name = impedence_fare_name,
+                                    prune_output = False
+                                )
+                            elif row["function"] == "exponential":
+                                beta = get_nexp_beta(row["params"],region)
+                                dft.impedence_calc(
+                                    cost_column = "time_all",
+                                    impedence_func = row["function"],
+                                    impedence_func_params = beta,
+                                    output_col_name = impedence_fare_name,
+                                    prune_output = False
+                                )
+                            else:
+                                None
+
+                        impedence_fare_name = row["function_name"] + "_lowcost"
+
+                        if row["function"] == "cumulative":
+                            theta = float(row["params"])
+                            dft.impedence_calc(
+                                cost_column = "time_lowcost",
+                                impedence_func = row["function"],
+                                impedence_func_params = theta,
+                                output_col_name = impedence_fare_name,
+                                prune_output = False
+                            )
+                        elif row["function"] == "exponential":
+                            beta = get_nexp_beta(row["params"],region)
+                            dft.impedence_calc(
+                                cost_column = "time_lowcost",
+                                impedence_func = row["function"],
+                                impedence_func_params = beta,
+                                output_col_name = impedence_fare_name,
+                                prune_output = False
+                            )
+                        else:
+                            None
+
+                        impedence_fare_name = row["function_name"] + "_fareY"
+
+                        impedence_fare_names.append(impedence_fare_name)
+
+                        dft.impedence_combine(
+                            columns = [row["function_name"] + "_fareN", "fare_all_cum"],
+                            how = "product",
+                            output_col_name = "imp_all",
+                            prune_output = True
+                        )
+
+                        dft.impedence_combine(
+                            columns = [row["function_name"] + "_lowcost","fare_lowcost_cum"],
+                            how = "product",
+                            output_col_name = "imp_lowcost",
+                            prune_output = True
+                        )
+
+                        dft.data[impedence_fare_name] = dft.data[["imp_lowcost","imp_all"]].max(axis=1)
+
+                        del dft.data[row["function_name"] + "_lowcost"]
+                        del dft.data["imp_lowcost"]
+                        del dft.data["imp_all"]
+
+                    else:
+                        None
+
+
+                # deleting for sake of memory
+                del dft.data["fare_all"]
+                del dft.data["fare_lowcost"]
+                del dft.data["fare_all_cum"]
+                del dft.data["fare_lowcost_cum"]
+                del dft.data["time_lowcost"]
+
+                # creating the tracc accessibility object
+                acc = tracc.accessibility(
+                    travelcosts_df = dft.data,
+                    supply_df = dfo.data,
+                    travelcosts_ids = ["o_block","d_block"],
+                    supply_ids = "GEOID"
+                )
+
+                # deleting for sake of memory
+                del dft
+
+                # looping over acc config file, computing all access measures
+                for index, row in access_measures.iterrows():
+
+                    # <dest>_<measure>_<param>_<period>_<autoFlag>_<fareFlag>_<date>
+
+                    if row["fare"] == 0:
+
+                        output_measure_name = row["destination"] + "_" + row["type_code"] + "_" + row["function_name"] + "_" + period_access  + "_" + "fareN"
+
+                        if row["type_code"] == "P":
+
+                            imp_name = row["function_name"] + "_fareN"
+                            temp_acc = acc.potential(
+                                opportunity = row["destination"],
+                                impedence = imp_name,
+                                output_col_name = "value"
+                            )
+                            temp_acc["measure"] = output_measure_name
+                            temp_acc.rename(columns = {'o_block':'GEOID'}, inplace = True)
+                            dfout_P = pd.concat([dfout_P,temp_acc])
+                            del temp_acc
+
+                        elif row["type_code"] == "M":
+
+                            temp_acc = acc.mintravelcost(
+                                travelcost = "time_all",
+                                opportunity = row["destination"],
+                                min_n = float(row["params"]),
+                                output_col_name = "value",
+                                fill_na_value = 100
+                            )
+                            temp_acc["measure"] = output_measure_name
+                            temp_acc.rename(columns = {'o_block':'GEOID'}, inplace = True)
+                            dfout_M = pd.concat([dfout_M,temp_acc])
+                            del temp_acc
+
+                    elif row["fare"] == 1:
+
+                        output_measure_name = row["destination"] + "_" + row["type_code"] + "_" + row["function_name"] + "_" + period_access + "_" + "fareN"
+
+                        if row["type_code"] == "P":
+
+                            imp_name = row["function_name"] + "_fareN"
+                            temp_acc = acc.potential(
+                                opportunity = row["destination"],
+                                impedence = imp_name,
+                                output_col_name = "value"
+                            )
+                            temp_acc["measure"] = output_measure_name
+                            temp_acc.rename(columns = {'o_block':'GEOID'}, inplace = True)
+                            dfout_P = pd.concat([dfout_P,temp_acc])
+                            del temp_acc
+
+                        elif row["type_code"] == "M":
+
+                            temp_acc = acc.mintravelcost(
+                                travelcost = "time_all",
+                                opportunity = row["destination"],
+                                min_n = float(row["params"]),
+                                output_col_name = "value",
+                                fill_na_value = 100
+                            )
+                            temp_acc["measure"] = output_measure_name
+                            temp_acc.rename(columns = {'o_block':'GEOID'}, inplace = True)
+                            dfout_M = pd.concat([dfout_M,temp_acc])
+                            del temp_acc
+
+
+
+                        output_measure_name = row["destination"] + "_" + row["type_code"] + "_" + row["function_name"] + "_" + period_access  + "_" + "fareY"
+
+                        if row["type_code"] == "P":
+
+                            imp_name = row["function_name"] + "_fareY"
+                            temp_acc = acc.potential(
+                                opportunity = row["destination"],
+                                impedence = imp_name,
+                                output_col_name = "value"
+                            )
+                            temp_acc["measure"] = output_measure_name
+                            temp_acc.rename(columns = {'o_block':'GEOID'}, inplace = True)
+                            dfout_P = pd.concat([dfout_P,temp_acc])
+                            del temp_acc
+
+                        elif row["type_code"] == "M":
+
+                            temp_acc = acc.mintravelcost(
+                                travelcost = "time_for_min_lowcost",
+                                opportunity = row["destination"],
+                                min_n = float(row["params"]),
+                                output_col_name = "value",
+                                fill_na_value = 100
+                            )
+                            temp_acc["measure"] = output_measure_name
+                            temp_acc.rename(columns = {'o_block':'GEOID'}, inplace = True)
+                            dfout_M = pd.concat([dfout_M,temp_acc])
+                            del temp_acc
+
+
+                # deleting the access object for sake of memore
+                del acc
+
+                i = i + 1
+
+
+
+    # delete the fare table since we dont need it anymore
+    del dff
+
+
+    # average over the multiple time periods
+    dfout_P = dfout_P.groupby(['GEOID', 'measure'], as_index=False).mean()
+    dfout_M = dfout_M.groupby(['GEOID', 'measure'], as_index=False).mean()
+
+
+    # setting anything with less than -1 to -1
+    # this is for M measures where we have data, but no trip to a zone with X destinations less than 90 minutes
+    dfout_M.loc[dfout_M['value'] > 90, 'value'] = -1
+
+    # joing the two
+    dfout = pd.concat([dfout_P,dfout_M])
+
+    # round result to one point
+    dfout["value_transit"] = dfout["value"].round(1)
+    del dfout["value"]
+
+
+    # setting up variable names for joining with auto accessibility
+    dfout[["variable","fare_info"]] = dfout["measure"].str.rsplit("_", n = 1, expand=True)
+    del dfout["measure"]
+
+
+    # read in the auto accessibility data
+    dfa = pd.read_csv("data/" + region + "/input/auto_travel_times/auto_accessibility.csv")
+    dfa = pd.melt(dfa, id_vars = ["GEOID"])
+    dfa["GEOID"] = dfa['GEOID'].astype(str)
+    dfa = dfa.replace(0, 1) # replacing 0 with 1 so we arent dividing by 0!)
+
+
+    # merging the auto accessibility
+    dfout = dfout.merge(dfa, how = "left", on = ["GEOID","variable"])
+
+
+    # creating the dataframe of only the plain transit measures (no auto ratio)
+    dfout_transit = dfout[["GEOID","variable","fare_info","value_transit"]]
+    # creating the proper measure name for this
+    dfout_transit["measure"] = dfout_transit["variable"] + "_autoN_" + dfout_transit["fare_info"] + "_" + date
+    del dfout_transit["variable"]
+    del dfout_transit["fare_info"]
+    dfout_transit.rename(columns = {'value_transit':'value'}, inplace = True)
+
+    # creating the measures as a ratio to auto times
+    dfout["value"] = dfout["value_transit"] / dfout["value"]
+    dfout["measure"] = dfout["variable"] + "_autoY_" + dfout["fare_info"] + "_" + date
+    del dfout["variable"]
+    del dfout["fare_info"]
+    del dfout["value_transit"]
+
+    # joining the two
+    dfout = pd.concat([dfout_transit, dfout])
+
+    # anything less than 0 to the -1 flag
+    dfout.loc[dfout['value'] < 0, 'value'] = -1
+
+    # data output
+    out_file_name = "data/" + region + "/output/" + "measures_" + date + "_" + period + ".csv"
+    dfout.to_csv(out_file_name, index = False)
+
+
+    # <dest>_<measure>_<param>_<period>_<autoFlag>_<fareFlag>_<date>
+
+
+
+
 
 
 def auto_accessibility(region, input_matrix):
 
-    # make sure directory is
-    # auto_travel_times
-    # --
+    # function for computing auto accessibility
+    # set up to run via compute_auto_accessibility.py
+
+    # make sure the data directory is as follows
+    #
+    # data
+    # --region
+    # ----input
+    # ------boundary_data
+    # --------block_group_poly.geojson
+    # --------block_group_pts.csv
+    # ------destination_data
+    # --------employment.csv
+    # --------groceries_snap.sv
+    # --------healthcare.csv
+    # --------education.csv
+    # --------greenspace.csv
+    # ------auto_travel_times
+    # --------AM.csv.gzp
+    # --------PM.csv.gzp
+    # --------WE.csv.gzp
+    # --------accessibility_chunks_AM/
+    # --------accessibility_chunks_PM/
+    # --------accessibility_chunks_WE/
+
 
     start_time = time.time()
 
@@ -142,10 +832,9 @@ def auto_accessibility(region, input_matrix):
         dfo = pd.merge(dfo,dftemp, how='left', left_on="GEOID", right_on="GEOID")
     del dftemp
     dfo["schools"] = dfo["count"]
-    dfo["parks"] = dfo["area"]
+    dfo["parks"] = dfo["area"] * 247.10538161 # from km2 to acres
     dfo["urgentcare"] = dfo["urgent_care_facilities"]
     del dfo["count"], dfo["area"], dfo["urgent_care_facilities"]
-    dfo = dfo.fillna(0)
     dfo = dfo.fillna(0)
 
 
@@ -170,6 +859,7 @@ def auto_accessibility(region, input_matrix):
         param = 10
     )
 
+
     # chunking the origins
     geoids = dfo["GEOID"].to_list()
     n_chunks = 500
@@ -179,27 +869,18 @@ def auto_accessibility(region, input_matrix):
     geoid_chunks = list(chunks(geoids,n_chunks))
 
 
-    # i = 0
-    # while i < len(geoid_chunks):
-    #     if 360050504001 in geoid_chunks[i]:
-    #         print(i)
-    #     i += 1
-
 
     # loading in the accessibility config file
     acc_config = pd.read_csv('accessibility/acc_config.csv')
     destination_types = list(acc_config.destination.unique())
 
-
     # unique impedence to compute
-    impedences = acc_config[acc_config.fare.isnull()]
-    impedences = impedences[["function_name","function","cost","params"]]
+    impedences = acc_config[acc_config["type_code"] != "M"]
+    impedences =  impedences[["function_name","function","cost","params"]]
     impedences = impedences.drop_duplicates()
 
-
     # access_measures
-    access_measures = acc_config[acc_config.fare.isnull()]
-    access_measures = access_measures[access_measures["fare"] != 1]
+    access_measures = acc_config
 
     # create the supply object
     dfo = tracc.supply(
@@ -216,7 +897,7 @@ def auto_accessibility(region, input_matrix):
     # printing number of chunks to output
     print("Total Chunks: ", len(geoid_chunks))
 
-    i = 24 # 11 (big, island),  18 (downtown)
+    i = 0 # 11 (big, island),  18 (downtown)
 
     # looping over chunks
     while i < len(geoid_chunks):
@@ -328,7 +1009,7 @@ def auto_accessibility(region, input_matrix):
         del missing
 
 
-        # set all intrazonal times to 0
+        # set all intrazonal times to -1
         dft.loc[dft['OriginName'] == dft["DestinationName"], 'Total_Time'] = -1
 
         # remove these
@@ -338,9 +1019,9 @@ def auto_accessibility(region, input_matrix):
         dfintsub = dfint[dfint.OriginName.isin(geoids)]
         dft = pd.concat([dft,dfintsub])
 
-        # add 2 min for parking, remove times over 120 min
+        # add 2 min for parking, remove times over 90 min
         dft["Total_Time"] = dft["Total_Time"] + 2
-        dft = dft[dft["Total_Time"] <= 120]
+        dft = dft[dft["Total_Time"] <= 90]
 
 
         # update name of time column for accessibility
@@ -389,12 +1070,14 @@ def auto_accessibility(region, input_matrix):
         # looping over acc config file, computing all access measures
         for index, row in access_measures.iterrows():
 
+            output_measure_name = row["destination"] + "_" + row["type_code"] + "_" + row["function_name"] + "_" + input_matrix
+
             if row["type"] == "potential":
 
                 temp_acc = acc.potential(
                     opportunity = row["destination"],
                     impedence = row["function_name"],
-                    output_col_name = row["name"]
+                    output_col_name = output_measure_name
 
                 )
                 temp_acc.rename(columns = {'OriginName':'GEOID'}, inplace = True)
@@ -407,7 +1090,7 @@ def auto_accessibility(region, input_matrix):
                     travelcost = row["cost"],
                     opportunity = row["destination"],
                     min_n = float(row["params"]),
-                    output_col_name = row["name"],
+                    output_col_name = output_measure_name,
                     fill_na_value = 999
                 )
 
@@ -434,28 +1117,52 @@ def auto_accessibility(region, input_matrix):
 
         i += 1
 
-        break
 
 
 
 
 
 
-def auto_accessibility_join(region, input_matrix):
+def auto_accessibility_join(region):
+
+    """
+    takes chunks of auto accessibility results and combines them into a single files
+    """
 
 
-    data_dir = "data/" + region + "/input/auto_travel_times/accessibility_chunks_" + input_matrix
+    data_dir = "data/" + region + "/input/auto_travel_times/accessibility_chunks_AM"
 
     dfs = []
     for filename in os.listdir(data_dir):
         if filename.endswith(".csv"):
-            print(filename)
             df = pd.read_csv(data_dir + "/" + filename)
-
-
-
             dfs.append(df)
-
     dfs = pd.concat(dfs)
 
-    dfs.to_csv("data/" + region + "/input/auto_travel_times/" + "auto_accessibility_" + input_matrix + ".csv", index = False)
+    dfo = dfs
+
+    data_dir = "data/" + region + "/input/auto_travel_times/accessibility_chunks_PM"
+
+    dfs = []
+    for filename in os.listdir(data_dir):
+        if filename.endswith(".csv"):
+            df = pd.read_csv(data_dir + "/" + filename)
+            dfs.append(df)
+    dfs = pd.concat(dfs)
+
+
+    dfo = dfo.merge(dfs,how="outer",on="GEOID")
+
+    data_dir = "data/" + region + "/input/auto_travel_times/accessibility_chunks_WE"
+
+    dfs = []
+    for filename in os.listdir(data_dir):
+        if filename.endswith(".csv"):
+            df = pd.read_csv(data_dir + "/" + filename)
+            dfs.append(df)
+    dfs = pd.concat(dfs)
+
+    dfo = dfo.merge(dfs,how="outer",on="GEOID")
+
+
+    dfo.to_csv("data/" + region + "/input/auto_travel_times/" + "auto_accessibility.csv", index = False)
