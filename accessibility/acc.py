@@ -6,9 +6,9 @@ import pandas as pd
 import numpy as np
 import geopandas as gpd
 from shapely.geometry import Point
-import swifter
-from gtfslite import GTFS
-import tracc
+import swifter # install via pip
+from gtfslite import GTFS # install via pip
+import tracc # install via pip
 import time
 
 
@@ -54,7 +54,7 @@ def levelofservice(region, gtfs_date):
     output_file_path = "data/" + region + "/output/" + "measures_" + gtfs_date + "_" + "LOS" + ".csv"
 
     # output measure name
-    output_measure_name = "los_trips_" + str(gtfs_date)
+    output_measure_name = "los_trips"
     print(output_measure_name)
 
 
@@ -149,10 +149,13 @@ def levelofservice(region, gtfs_date):
     output = output.fillna(0)
 
     # updating column names
-    output.columns = ["GEOID","value"]
+    output.columns = ["bg_id","score"]
 
     # add column for measure name
-    output["measure"] = output_measure_name
+    output["score_key"] = output_measure_name
+
+    # adding in a field for date
+    output["date"] = str(gtfs_date)
 
     # saving output
     output.to_csv(output_file_path, index = False)
@@ -219,11 +222,20 @@ def transit_accessibility(region, date, period):
     del dfint["radius"]
 
 
-    # get fare threshold
+    # zones with weird data that we need to smooth that didnt come up originally:
+    also_missing = {
+        "New York": [360470193003,340170103004]
+    }
+    also_missing = also_missing[region]
+
+
+
+    # get fare threshold, and the date for fares
     acc_config_region = pd.read_csv('accessibility/acc_config_regional.csv')
     acc_config_region = acc_config_region[acc_config_region["region"] == region]
     fare_threshold = float(acc_config_region["fare_threshold"])
-
+    print(fare_threshold + 0.01)
+    fare_date = acc_config_region["fare_date"].iloc[0]
 
     # getting a neighbourds matrix
     from tracc.spatial import get_neighbours
@@ -269,6 +281,7 @@ def transit_accessibility(region, date, period):
     )
 
 
+
     # chunking the origins
     geoids = dfo.data["GEOID"].to_list()
     n_chunks = 2000
@@ -288,14 +301,20 @@ def transit_accessibility(region, date, period):
         period_access = "AM"
 
     # load in the fares data for this time period
-    dff = pd.read_csv("data/" + region + "/otp/itinerary/fares/period_" + period_times + ".csv")
-    dff = dff[["o_block","d_block","fare_all","fare_lowcost"]]
+    dff = pd.read_csv("data/" + region + "/otp/itinerary/fares/" + fare_date + "/period_" + period_times + ".csv")
+    dff = dff[["origin_block","destination_block","fare_all","fare_lowcost"]]
+    dff = dff.rename(columns = {"origin_block":"o_block"})
+    dff = dff.rename(columns = {"destination_block":"d_block"})
+
+    dff["fare_all"] = dff["fare_all"].round(2)
+    dff["fare_lowcost"] = dff["fare_lowcost"].round(2)
+
 
     # creating the output dataframe
     dfout_P = pd.DataFrame(columns=['GEOID', 'measure', 'value'])
     dfout_M = pd.DataFrame(columns=['GEOID', 'measure', 'value'])
 
-    # loop over the 8 times
+    # loop over the (8 or 2) travel time matrices in the study period (e.g. in AM, PM, WE)
     i = 0
     directory = "data/" + region + "/otp/itinerary/travel_times/" + date + "/period" + period_times + "/"
     for filename in os.listdir(directory):
@@ -303,6 +322,8 @@ def transit_accessibility(region, date, period):
 
             travel_time_matrix = os.path.join(directory, filename)
             i += 1
+
+            print(travel_time_matrix)
 
             # read in the travel time matrix
             dftall = pd.read_csv(travel_time_matrix)
@@ -335,12 +356,12 @@ def transit_accessibility(region, date, period):
                 dft = dft.merge(dff, how='left', on=['o_block','d_block'])
 
 
-                # change to dollars if not already here
+
+
 
                 # take any NA values for fares, and apply a very high fare
-                df['fare_all'] = df['fare_all'].fillna(99)
-                df['fare_lowcost'] = df['fare_lowcost'].fillna(99)
-
+                dft['fare_all'] = dft['fare_all'].fillna(99)
+                dft['fare_lowcost'] = dft['fare_lowcost'].fillna(99)
 
 
                 # filling in missing costs, at the origin:
@@ -349,9 +370,9 @@ def transit_accessibility(region, date, period):
                 li2 = geoids
                 missing = [x for x in li2 if x not in li1]
 
-                # for extra_missing in also_missing:
-                #     if extra_missing in geoids:
-                #         missing.append(extra_missing)
+                for extra_missing in also_missing:
+                    if extra_missing in geoids:
+                        missing.append(extra_missing)
 
                 if len(missing) >= 1:
 
@@ -394,9 +415,9 @@ def transit_accessibility(region, date, period):
                 li2 = geoids
                 missing = [x for x in li2 if x not in li1]
 
-                # for extra_missing in also_missing:
-                #     if extra_missing in geoids:
-                #         missing.append(extra_missing)
+                for extra_missing in also_missing:
+                    if extra_missing in geoids:
+                        missing.append(extra_missing)
 
                 if len(missing) >= 1:
 
@@ -448,7 +469,7 @@ def transit_accessibility(region, date, period):
                 dft = tracc.costs(dft)
 
 
-                # calc base fare impedence, i.e. removing
+                # calc base fare impedence, i.e. assigning 1 or 0 if under or over the fare threshold
                 dft.impedence_calc(
                     cost_column = "fare_all",
                     impedence_func = "cumulative",
@@ -464,6 +485,7 @@ def transit_accessibility(region, date, period):
                     prune_output = False
                 )
 
+
                 # create a time field for mintraveltime measures with a fare threshold
                 dft.data["temp1"] = dft.data["time_all"] * dft.data["fare_all_cum"]
                 dft.data["temp1"] = dft.data["temp1"].replace(0, 999)
@@ -472,20 +494,19 @@ def transit_accessibility(region, date, period):
                 dft.data["time_for_min_lowcost"] = dft.data[["temp1","temp2"]].max(axis=1)
                 del dft.data["temp1"]
                 del dft.data["temp2"]
+                # thte result of "time_for_min_lowcost" is the minimum travel time
 
 
                 # loop over acc config file, computing all impedences
                 impedence_fare_names = []
                 for index, row in impedences_times.iterrows():
 
+                    # when we are not including a fare threshold
                     if row["fare"] == 0:
 
                         impedence_fare_name = row["function_name"] + "_fareN"
-
                         if impedence_fare_name not in impedence_fare_names:
-
                             impedence_fare_names.append(impedence_fare_name)
-
                             if row["function"] == "cumulative":
                                 theta = float(row["params"])
                                 dft.impedence_calc(
@@ -507,14 +528,13 @@ def transit_accessibility(region, date, period):
                             else:
                                 None
 
+                    # when we are additionally including a fare threshold
                     elif row["fare"] == 1:
 
+                        # impedences for complete network
                         impedence_fare_name = row["function_name"] + "_fareN"
-
                         if impedence_fare_name not in impedence_fare_names:
-
                             impedence_fare_names.append(impedence_fare_name)
-
                             if row["function"] == "cumulative":
                                 theta = float(row["params"])
                                 dft.impedence_calc(
@@ -536,8 +556,8 @@ def transit_accessibility(region, date, period):
                             else:
                                 None
 
+                        # impedences for lowcost network
                         impedence_fare_name = row["function_name"] + "_lowcost"
-
                         if row["function"] == "cumulative":
                             theta = float(row["params"])
                             dft.impedence_calc(
@@ -559,17 +579,17 @@ def transit_accessibility(region, date, period):
                         else:
                             None
 
+                        # find the
                         impedence_fare_name = row["function_name"] + "_fareY"
-
                         impedence_fare_names.append(impedence_fare_name)
 
+                        # combine the fare and time impedences (e.g. if either are 0, then the overarll impedence is 0)
                         dft.impedence_combine(
                             columns = [row["function_name"] + "_fareN", "fare_all_cum"],
                             how = "product",
                             output_col_name = "imp_all",
                             prune_output = True
                         )
-
                         dft.impedence_combine(
                             columns = [row["function_name"] + "_lowcost","fare_lowcost_cum"],
                             how = "product",
@@ -577,6 +597,7 @@ def transit_accessibility(region, date, period):
                             prune_output = True
                         )
 
+                        # return the trip with the greater impedence value
                         dft.data[impedence_fare_name] = dft.data[["imp_lowcost","imp_all"]].max(axis=1)
 
                         del dft.data[row["function_name"] + "_lowcost"]
@@ -585,6 +606,9 @@ def transit_accessibility(region, date, period):
 
                     else:
                         None
+
+
+
 
 
                 # deleting for sake of memory
@@ -608,12 +632,16 @@ def transit_accessibility(region, date, period):
                 # looping over acc config file, computing all access measures
                 for index, row in access_measures.iterrows():
 
+                    # naming convention for the measure
                     # <dest>_<measure>_<param>_<period>_<autoFlag>_<fareFlag>_<date>
 
+                    # if we are not including a fare threshold for this measure
                     if row["fare"] == 0:
 
+                        # measure ename
                         output_measure_name = row["destination"] + "_" + row["type_code"] + "_" + row["function_name"] + "_" + period_access  + "_" + "fareN"
 
+                        # if it is a measure of potential accessibility
                         if row["type_code"] == "P":
 
                             imp_name = row["function_name"] + "_fareN"
@@ -627,6 +655,7 @@ def transit_accessibility(region, date, period):
                             dfout_P = pd.concat([dfout_P,temp_acc])
                             del temp_acc
 
+                        # if it is a minimum travel time measure
                         elif row["type_code"] == "M":
 
                             temp_acc = acc.mintravelcost(
@@ -641,10 +670,13 @@ def transit_accessibility(region, date, period):
                             dfout_M = pd.concat([dfout_M,temp_acc])
                             del temp_acc
 
+                    # if we are additionally incorporating a fare threshold for this measure
                     elif row["fare"] == 1:
 
+                        # name of measure
                         output_measure_name = row["destination"] + "_" + row["type_code"] + "_" + row["function_name"] + "_" + period_access + "_" + "fareN"
 
+                        # if it is a measure of potential accessibility
                         if row["type_code"] == "P":
 
                             imp_name = row["function_name"] + "_fareN"
@@ -658,6 +690,7 @@ def transit_accessibility(region, date, period):
                             dfout_P = pd.concat([dfout_P,temp_acc])
                             del temp_acc
 
+                        # if it is a minimum travel time measure
                         elif row["type_code"] == "M":
 
                             temp_acc = acc.mintravelcost(
@@ -673,9 +706,10 @@ def transit_accessibility(region, date, period):
                             del temp_acc
 
 
-
+                        # name of measure
                         output_measure_name = row["destination"] + "_" + row["type_code"] + "_" + row["function_name"] + "_" + period_access  + "_" + "fareY"
 
+                        # if it is a measure of potential accessibility
                         if row["type_code"] == "P":
 
                             imp_name = row["function_name"] + "_fareY"
@@ -689,6 +723,7 @@ def transit_accessibility(region, date, period):
                             dfout_P = pd.concat([dfout_P,temp_acc])
                             del temp_acc
 
+                        # if it is a minimum travel time measure
                         elif row["type_code"] == "M":
 
                             temp_acc = acc.mintravelcost(
@@ -704,10 +739,14 @@ def transit_accessibility(region, date, period):
                             del temp_acc
 
 
-                # deleting the access object for sake of memore
+                # deleting the access object for sake of memory
                 del acc
 
                 i = i + 1
+
+
+                # break for testing
+                # break
 
 
 
@@ -715,9 +754,10 @@ def transit_accessibility(region, date, period):
     del dff
 
 
+
     # average over the multiple time periods
     dfout_P = dfout_P.groupby(['GEOID', 'measure'], as_index=False).mean()
-    dfout_M = dfout_M.groupby(['GEOID', 'measure'], as_index=False).mean()
+    # dfout_M = dfout_M.groupby(['GEOID', 'measure'], as_index=False).mean()
 
 
     # setting anything with less than -1 to -1
@@ -751,14 +791,14 @@ def transit_accessibility(region, date, period):
     # creating the dataframe of only the plain transit measures (no auto ratio)
     dfout_transit = dfout[["GEOID","variable","fare_info","value_transit"]]
     # creating the proper measure name for this
-    dfout_transit["measure"] = dfout_transit["variable"] + "_autoN_" + dfout_transit["fare_info"] + "_" + date
+    dfout_transit["measure"] = dfout_transit["variable"] + "_autoN_" + dfout_transit["fare_info"]
     del dfout_transit["variable"]
     del dfout_transit["fare_info"]
     dfout_transit.rename(columns = {'value_transit':'value'}, inplace = True)
 
     # creating the measures as a ratio to auto times
     dfout["value"] = dfout["value_transit"] / dfout["value"]
-    dfout["measure"] = dfout["variable"] + "_autoY_" + dfout["fare_info"] + "_" + date
+    dfout["measure"] = dfout["variable"] + "_autoY_" + dfout["fare_info"]
     del dfout["variable"]
     del dfout["fare_info"]
     del dfout["value_transit"]
@@ -766,13 +806,23 @@ def transit_accessibility(region, date, period):
     # joining the two
     dfout = pd.concat([dfout_transit, dfout])
 
+    # adding in a field for the date
+    dfout["date"] = str(date)
+
     # anything less than 0 to the -1 flag
     dfout.loc[dfout['value'] < 0, 'value'] = -1
+
+    # updating column names
+    dfout = dfout.rename(columns = {"GEOID":"bg_id"})
+    dfout = dfout.rename(columns = {"value":"score"})
+    dfout = dfout.rename(columns = {"measure":"score_key"})
 
     # data output
     out_file_name = "data/" + region + "/output/" + "measures_" + date + "_" + period + ".csv"
     dfout.to_csv(out_file_name, index = False)
 
+    print(time.time() - start_time)
+    print(dfout)
 
     # <dest>_<measure>_<param>_<period>_<autoFlag>_<fareFlag>_<date>
 

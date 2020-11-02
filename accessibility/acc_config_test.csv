@@ -1,3 +1,2 @@
 type_code,type,destination,function_name,function,cost,params,fare,auto
-M,mintraveltime,snap,t1,mintraveltime,time,1,0,1
-P,potential,parks,c15,cumulative,time,15,0,1
+P,potential,C000,c60,cumulative,time,60,1,1
