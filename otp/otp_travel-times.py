@@ -17,7 +17,7 @@ config = ConfigParser.RawConfigParser()
 
 # input args from otp_handler
 parser = optparse.OptionParser()
-parser.add_option("-d", '--date', default = datetime.datetime.now().strftime('%Y-%m-%d'), help="input date for otp")
+parser.add_option("-d", '--date', help="input date for otp")
 parser.add_option("-t", '--hour', default = 8, help="hour")
 parser.add_option("-y", '--minute', default = '00', help="minute")
 parser.add_option("-m", '--mode', default = 'TRANSIT', help="mode to check")
@@ -50,7 +50,6 @@ lowcost = options.lowcost
 suffix = options.suffix
 
 dt = datetime.datetime.strptime(o_date, '%Y-%m-%d') # date in string form
-dt_tm = datetime.datetime.combine(dt, datetime.time(hr, minute)) #date in datetime
 
 #calling otp jython
 otp = OtpsEntryPoint.fromArgs([ "--graphs", graph_path, "--router", "graphs-"+date ])
