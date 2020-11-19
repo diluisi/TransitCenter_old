@@ -28,7 +28,6 @@ sys.path.insert(1, str(root_path.parent)+'/fare')
 import fare
 
 
-
 parser = argparse.ArgumentParser(description='Process region')
 parser.add_argument("-d", '--date', default = datetime.datetime.now().strftime('%Y-%m-%d'), help="input date for otp, YYYY-MM-DD")
 parser.add_argument("-r", '--region',  help="Region to evaluate")
@@ -73,13 +72,13 @@ mode = 'TRANSIT'
 def call_otp():
     
     command = ['java', '-Xmx4G', '-jar', otp_path+'/otp-1.4.0-shaded.jar', '--router', 'graphs-'+date,
-          '--graphs', graph_path, '--server', '--enableScriptingWebService']
+          '--graphs', graph_path, '--server', '--enableScriptingWebService', '--maxThreads', str(threads)]
     
     print('\njava -Xmx4G -jar ' + otp_path+'/otp-1.4.0-shaded.jar'+ ' --router '+ 'graphs-'+date+
           ' --graphs '+graph_path+' --server'+' --enableScriptingWebService\n')
     p = Popen(command)
     
-    time.sleep(300) #time needed to ensure the otp server starts up
+    time.sleep(90) #time needed to ensure the otp server starts up
     return p
 
 # function to return the itineraries
@@ -153,8 +152,13 @@ def analyst(x, y):
 if __name__ == '__main__':
     
     # ensuring parrallel processing works on mac os
-    __spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
+    # __spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
     start_time = time.time()
+    
+    os.makedirs(outpath + '/' + 'fares', exist_ok=True)
+    os.makedirs(outpath + '/fares' + '/' + str(date), exist_ok=True)
+    
+    df_path = outpath + '/fares' + '/' + str(date) 
     
     # connect to database
     DB_NAME = fare_path + '/FareDB.db'
@@ -236,8 +240,13 @@ if __name__ == '__main__':
         x1 = row['LONGITUDE']
         y1 = row['LATITUDE']
         origin = int(row['GEOID'])
-        
-        # calling isochrones
+
+        #for testing purposes, running a limited set
+        # if index > 2499:
+        #     break 
+        # if index < 4:
+        #     continue
+        #calling isochrones
         try:
             data = analyst(x1, y1)
         except:
@@ -245,18 +254,17 @@ if __name__ == '__main__':
             # print(x1, y1)
             continue
         
-        # filters out blocks with travel time over 120 minutes
+        # filters out blocks with travel time over 90 minutes
         iso_120 = gpd.GeoDataFrame.from_features(data["features"])
         gdf_120 = gpd.sjoin(iso_120, gdf_pts, how="left")
         df_120 = pd.DataFrame(gdf_120).reset_index()
+        df_120 = df_120.sample(frac=1).reset_index(drop=True)
 
         df_pts = pd.read_csv(pts_path)
         
         dest_lst = []
         start = 0
-        # for testing purposes, running a limited set
-        # if index == 5:
-        #     break
+
         for index2, row2 in df_120.groupby(df_120.index // threads):
             
             print(index, index2)
@@ -300,7 +308,10 @@ if __name__ == '__main__':
                     
                 for f in concurrent.futures.as_completed(thread_lst):
                     # retrieving the information from each thread for the otp call
-                    result.append(f.result())
+                    try:
+                        result.append(f.result())
+                    except:
+                        pass
             
             #lowcost network calculations
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -310,108 +321,116 @@ if __name__ == '__main__':
                     
                 for f in concurrent.futures.as_completed(thread_lst_lowcost):
                     # retrieving the information from each thread for the otp call
-                    result_lowcost.append(f.result())
+                    try:
+                        result_lowcost.append(f.result())
+                    except:
+                        pass
                     
             start = start + threads
             
             
             for j in range(0, threads):
                 # storing the output information into output
-                
+                try:
                 # checks if otp was able to calculate the itinerary
-                if 'plan' in result[j].keys():
-                    
-                    fare_dict = {
-                      "OTP_itinerary_all": result[j]
-                    }
-                    
-                    try:
-                        #calling the fare values, otherwise it will append to traceback
-                        fare_cost = fare.fare(fare_dict, region, c)
-                        if dest_lst[j] == 0:
-                            continue
+                    if 'plan' in result[j].keys():
                         
-                        output_lst.append([origin, dest_lst[j], fare_cost, result[j]['plan']['itineraries'][0]['duration']])
-
-                        full = error_dict 
-                        full['origin_tract'] = origin
-                        full['destination_tract'] = dest_lst[j]
-                        full['departure_datetime'] = str(tm)
-                        full['fare_dict'] = fare_dict
-                        full['traceback'] = traceback.format_exc()
+                        fare_dict = {
+                          "OTP_itinerary_all": result[j]
+                        }
                         
-                        full_json.append(dict(full))
-                        full = ""
-                        fare_lst.append(fare_dict)
-
-
-                    except:
-                        error_data = error_dict 
-                        error_data['origin_tract'] = origin
-                        error_data['destination_tract'] = dest_lst[j]
-                        error_data['departure_datetime'] = str(tm)
-                        error_data['fare_dict'] = fare_dict
-                        error_data['traceback'] = traceback.format_exc()
-                        
-                        error_json.append(dict(error_data))
-                        error_data = ""
-                        fare_error.append(fare_dict)
-           
+                        try:
+                            #calling the fare values, otherwise it will append to traceback
+                            fare_cost = fare.fare(fare_dict, region, c)
+                            if dest_lst[j] == 0:
+                                continue
+                            
+                            output_lst.append([origin, dest_lst[j], fare_cost, result[j]['plan']['itineraries'][0]['duration']])
+    
+                            # full = error_dict 
+                            # full['origin_tract'] = origin
+                            # full['destination_tract'] = dest_lst[j]
+                            # full['departure_datetime'] = str(tm)
+                            # full['fare_dict'] = fare_dict
+                            # full['traceback'] = traceback.format_exc()
+                            
+                            # full_json.append(dict(full))
+                            # full = ""
+                            # fare_lst.append(fare_dict)
+    
+    
+                        except:
+                            error_data = error_dict 
+                            error_data['origin_tract'] = origin
+                            error_data['destination_tract'] = dest_lst[j]
+                            error_data['departure_datetime'] = str(tm)
+                            error_data['fare_dict'] = fare_dict
+                            error_data['traceback'] = traceback.format_exc()
+                            
+                            error_json.append(dict(error_data))
+                            error_data = ""
+                            fare_error.append(fare_dict)
+                except:
+                    pass
+                try:
                 
                 # low cost network 
-                if 'plan' in result_lowcost[j].keys():
-                    
-                    fare_dict = {
-                      "OTP_itinerary_all": result_lowcost[j]
-                    }
-                    
-                    try:
-                        #calling the fare values, otherwise it will append to traceback
-                        fare_cost = fare.fare(fare_dict, region, c)
-                        if dest_lst[j] == 0:
-                            continue
+                    if 'plan' in result_lowcost[j].keys():
                         
-                        output_lst_lowcost.append([origin, dest_lst[j], fare_cost, result_lowcost[j]['plan']['itineraries'][0]['duration']])
-
-                        full = error_dict 
-                        full['origin_tract'] = origin
-                        full['destination_tract'] = dest_lst[j]
-                        full['departure_datetime'] = str(tm)
-                        full['fare_dict'] = fare_dict
-                        full['traceback'] = traceback.format_exc()
+                        fare_dict = {
+                          "OTP_itinerary_all": result_lowcost[j]
+                        }
                         
-                        full_json.append(dict(full))
-                        full = ""
-                        fare_lst.append(fare_dict)
-
-
-                    except:
-                        error_data = error_dict 
-                        error_data['origin_tract'] = origin
-                        error_data['destination_tract'] = dest_lst[j]
-                        error_data['departure_datetime'] = str(tm)
-                        error_data['fare_dict'] = fare_dict
-                        error_data['traceback'] = traceback.format_exc()
-                        
-                        error_json.append(dict(error_data))
-                        error_data = ""
-                        fare_error.append(fare_dict)
-
-
-    os.makedirs(outpath + '/' + 'fares', exist_ok=True)
-    os.makedirs(outpath + '/fares' + '/' + str(date_us), exist_ok=True)
+                        try:
+                            #calling the fare values, otherwise it will append to traceback
+                            fare_cost = fare.fare(fare_dict, region, c)
+                            if dest_lst[j] == 0:
+                                continue
+                            
+                            output_lst_lowcost.append([origin, dest_lst[j], fare_cost, result_lowcost[j]['plan']['itineraries'][0]['duration']])
     
-    df_path = outpath + '/fares' + '/' + str(date_us) 
+                            # full = error_dict 
+                            # full['origin_tract'] = origin
+                            # full['destination_tract'] = dest_lst[j]
+                            # full['departure_datetime'] = str(tm)
+                            # full['fare_dict'] = fare_dict
+                            # full['traceback'] = traceback.format_exc()
+                            
+                            # full_json.append(dict(full))
+                            # full = ""
+                            # fare_lst.append(fare_dict)
+    
+    
+                        except:
+                            error_data = error_dict 
+                            error_data['origin_tract'] = origin
+                            error_data['destination_tract'] = dest_lst[j]
+                            error_data['departure_datetime'] = str(tm)
+                            error_data['fare_dict'] = fare_dict
+                            error_data['traceback'] = traceback.format_exc()
+                            
+                            error_json.append(dict(error_data))
+                            error_data = ""
+                            fare_error.append(fare_dict)
+                except:
+                    pass
+            
+            if index%100 == 0:
+                output = pd.DataFrame(output_lst, columns = columns)
+                output_lowcost = pd.DataFrame(output_lst_lowcost, columns = columns_lowcost)
+                fare_df = pd.merge(output, output_lowcost, on = ['origin_tract', 'destination_tract'], how = 'outer')
+                fare_df.to_csv(df_path + '/' + 'Ver1period_' + period + '.csv', index = False)
+            
     
     end_time = time.time()
 
     # write to csv
     output = pd.DataFrame(output_lst, columns = columns)
     output_lowcost = pd.DataFrame(output_lst_lowcost, columns = columns_lowcost)
-    # output.to_csv(df_path + '/' + 'period_' + period + '.csv', index = False)
+
     
     fare_df = pd.merge(output, output_lowcost, on = ['origin_tract', 'destination_tract'], how = 'outer')
-    fare_df.to_csv(df_path + '/' + 'period_' + period + '.csv', index = False)
+    fare_df.to_csv(df_path + '/' + 'Ver1period_' + period + '.csv', index = False)
     
     #writing the error json
     if len(error_json) >= 1:
@@ -421,9 +440,9 @@ if __name__ == '__main__':
             json.dump(error_json, f)
 
     #outputing the entire json of the itineraries for testing purposes
-    full_path = df_path+'/full' + '.json'
-    with open(full_path, 'w') as f:
-        json.dump(full_json, f)
+    # full_path = df_path+'/full' + '.json'
+    # with open(full_path, 'w') as f:
+    #     json.dump(full_json, f)
     print(len(output))
     
     print(end_time - start_time)

@@ -5,7 +5,6 @@ import time
 import csv 
 import sys
 import optparse
-import datetime
 import os
 import ConfigParser
 
@@ -17,7 +16,7 @@ config = ConfigParser.RawConfigParser()
 
 # input args from otp_handler
 parser = optparse.OptionParser()
-parser.add_option("-d", '--date', default = datetime.datetime.now().strftime('%Y-%m-%d'), help="input date for otp")
+parser.add_option("-d", '--date', help="input date for otp")
 parser.add_option("-t", '--hour', default = 8, help="hour")
 parser.add_option("-y", '--minute', default = '00', help="minute")
 parser.add_option("-m", '--mode', default = 'TRANSIT', help="mode to check")
@@ -49,8 +48,8 @@ o_date = options.date
 lowcost = options.lowcost
 suffix = options.suffix
 
-dt = datetime.datetime.strptime(o_date, '%Y-%m-%d') # date in string form
-dt_tm = datetime.datetime.combine(dt, datetime.time(hr, minute)) #date in datetime
+# dt = datetime.datetime.strptime(o_date, '%Y-%m-%d') 
+# date in string form
 
 #calling otp jython
 otp = OtpsEntryPoint.fromArgs([ "--graphs", graph_path, "--router", "graphs-"+date ])
@@ -68,7 +67,7 @@ i = 0
 
  
 mode_str = mode +',WALK'
-max_time = 7200
+max_time = 5400
 initial_wait = 0
 walk_dist = 5000
 
@@ -78,7 +77,7 @@ for origin in points:
 
     #all possible arguments from the api are in the code, however some are commented out
     r = otp.createRequest()
-    r.setDateTime(dt.year, dt.month, dt.day, hr, minute, 00) # departure date / time
+    r.setDateTime(int(o_date[0:4]), int(o_date[5:7]), int(o_date[8:10]), hr, minute, 00) # departure date / time
     r.setModes(mode_str) # modes to include
     r.setMaxTimeSec(max_time) # time out (in seconds)
     r.setClampInitialWait(initial_wait) #initial wait
@@ -120,12 +119,11 @@ run_no = 'Run '+num
 config.add_section(run_no)
 config.set(run_no, 'region', region)
 config.set(run_no, 'o_path', o_path)
-config.set(run_no, 'run_time', str(datetime.datetime.now()))
 config.set(run_no, 'mode', mode_str)
 config.set(run_no, 'max_time', str(max_time))
 config.set(run_no, 'initial_wait', str(initial_wait))
 config.set(run_no, 'max_walk', str(walk_dist))
-config.set(run_no, 'date', str(date))
+config.set(run_no, 'date', str(o_date))
 config.set(run_no, 'region', region)
 config.set(run_no, 'hour', str(hr))
 config.set(run_no, 'minute', str(minute))
