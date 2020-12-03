@@ -1,8 +1,8 @@
 region,fare_threshold,median_time_work,median_time_school,median_time_groceries,median_time_parks,median_time_healthcare,fare_date
-Boston,5,30,,,,
-Chicago,4,30,,,,
-District of Columbia,5,30,,,,
-Los Angeles,4,30,,,,
+Boston,5,30,30,11,15,20,"2020-10-11"
+Chicago,4,30,30,11,15,20,"2020-10-11"
+District of Columbia,5,30,30,11,15,20,"2020-10-11"
+Los Angeles,4,30,30,11,15,20,"2020-10-11"
 New York,5,30,30,11,15,20,"2020-10-11"
-Philadelphia,4,30,,,,
-San Francisco-Oakland,5,30,,,,
+Philadelphia,4,30,30,11,15,20,"2020-10-11"
+San Francisco-Oakland,5,30,30,11,15,20,"2020-10-11"
