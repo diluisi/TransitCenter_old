@@ -228,7 +228,7 @@ if __name__ == '__main__':
         
     date_row = [o_date, period]
 
-    with open(config[region]['gtfs_static'] + 'run_dates.csv','a') as fd:
+    with open(config[region]['gtfs_static'] + '/run_dates.csv','a') as fd:
         wr = csv.writer(fd, quoting=csv.QUOTE_ALL)
         wr.writerow(row)
         
