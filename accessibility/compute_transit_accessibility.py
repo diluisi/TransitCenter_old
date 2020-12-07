@@ -8,16 +8,7 @@ def compute_region_date(region, date):
     acc.levelofservice(region, date)
     # return None
 
-compute_region_date("New York", "2020-05-10")
+# compute_region_date("New York", "2020-02-23")
+# compute_region_date("New York", "2020-05-10")
 # compute_region_date("New York", "2020-09-20")
-# compute_region_date("New York", "2020-10-11")
-
-
-# install packages
-
-# fares to block groups
-
-# test for a date with just 2 times
-
-
-# so the travel times for 02-23 have 26 million rows, but the fares table only has 18 million rows
+compute_region_date("New York", "2020-10-11")

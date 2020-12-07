@@ -62,10 +62,22 @@ def levelofservice(region, gtfs_date):
     gtfs_date = datetime.datetime.strptime(gtfs_date, '%Y-%m-%d')
     dates = []
     i = 0
-    while i < 7:
+    while i < 4:
         date = gtfs_date.date() - datetime.timedelta(days=i)
         dates.append(date)
         i += 1
+    i = 1
+    while i < 4:
+        date = gtfs_date.date() + datetime.timedelta(days=i)
+        dates.append(date)
+        i += 1
+
+    # while i < 7:
+    #     date = gtfs_date.date() - datetime.timedelta(days=i)
+    #     dates.append(date)
+    #     i += 1
+
+    print(dates)
 
     # crs dictionary needed for polygon buffering
     crs = {
@@ -103,6 +115,9 @@ def levelofservice(region, gtfs_date):
     for filename in os.listdir(gtfs_folder):
         if filename.endswith(".zip"):
             gtfs_path = os.path.join(gtfs_folder, filename)
+
+            print("-----------------------------")
+
             print(gtfs_path)
 
             try:
@@ -124,17 +139,23 @@ def levelofservice(region, gtfs_date):
                 for date in dates:
 
                     # compute number of trips per block group, usinig the above function, and applied for each block group
-                    unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
+                    print(date)
+                    try:
+                        unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
+                        print("Success")
+                    except:
+                        print("Failed - no stops on this date")
 
                     output.append(unique_geoid)
 
                 print("SUCCESS")
-
+            #
             except:
-                print("FAILED")
+                print("FAILED - for some unknown reason")
 
             print(time.time() - start_time)
 
+            print("-----------------------------")
 
     # creating single dataframe for all outupts
     output = pd.concat(output)
