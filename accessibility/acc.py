@@ -64,24 +64,23 @@ def levelofservice(region, gtfs_date):
 
     # get a list the 7 dates for analysis
     gtfs_date = datetime.datetime.strptime(gtfs_date, '%Y-%m-%d')
-    dates = []
-    i = 0
-    while i < 4:
-        date = gtfs_date.date() - datetime.timedelta(days=i)
-        dates.append(date)
-        i += 1
-    i = 1
-    while i < 4:
-        date = gtfs_date.date() + datetime.timedelta(days=i)
-        dates.append(date)
-        i += 1
+    # dates = []
+    # i = 0
+    # while i < 4:
+    #     date = gtfs_date.date() - datetime.timedelta(days=i)
+    #     dates.append(date)
+    #     i += 1
+    # i = 1
+    # while i < 4:
+    #     date = gtfs_date.date() + datetime.timedelta(days=i)
+    #     dates.append(date)
+    #     i += 1
 
     # while i < 7:
     #     date = gtfs_date.date() - datetime.timedelta(days=i)
     #     dates.append(date)
     #     i += 1
 
-    print(dates)
 
     # crs dictionary needed for polygon buffering
     crs = {
@@ -124,71 +123,115 @@ def levelofservice(region, gtfs_date):
 
             print(gtfs_path)
 
+            gtfs = GTFS.load_zip(gtfs_path)
+
+            # converting the stops file into a geopandas point dataframe
+            stops_geometry = [Point(xy) for xy in zip(gtfs.stops.stop_lon, gtfs.stops.stop_lat)]
+            stops_gdf = gtfs.stops.drop(['stop_lon', 'stop_lat'], axis=1)
+            stops_gdf = gpd.GeoDataFrame(stops_gdf, crs="EPSG:4326", geometry=stops_geometry)
+
+            # spatial join block group to stop points
+            stops_geoid = gpd.sjoin(stops_gdf, gdf, op="within")[["stop_id","GEOID"]]
+
+            # getting a unique list of block groups that have stops
+            unique_geoid = pd.DataFrame(stops_geoid.GEOID.unique(), columns = ["GEOID"])
+
+            # gtfs_date  first_date:
+            #     gtfs_date.date() + datetime.timedelta(days=7)
+
+            summary = gtfs.summary()
+            first_date = summary["first_date"]
+            last_date = summary["last_date"]
+            run_date_sat = gtfs_date.date() + datetime.timedelta(days=6)
+            run_date_sun = gtfs_date.date()
+            run_date_wk = gtfs_date.date() + datetime.timedelta(days=3)
+
+            print(first_date,last_date)
+            print(gtfs_date)
+
+            while run_date_wk < first_date:
+                run_date_wk = run_date_wk + datetime.timedelta(days=7)
+            while run_date_sat < first_date:
+                run_date_sat = run_date_sat + datetime.timedelta(days=7)
+            while run_date_sun < first_date:
+                run_date_sun = run_date_sun + datetime.timedelta(days=7)
+
+            while run_date_wk > last_date:
+                run_date_wk = run_date_wk - datetime.timedelta(days=7)
+            while run_date_sat > last_date:
+                run_date_sat = run_date_sat - datetime.timedelta(days=7)
+            while run_date_sun > last_date:
+                run_date_sun = run_date_sun - datetime.timedelta(days=7)
+
+            # if veterans day
+            if run_date_wk == datetime.datetime.strptime("2020-11-11", '%Y-%m-%d').date():
+                print("meow")
+                run_date_wk = run_date_wk + datetime.timedelta(days=1)
+
+            # compute number of trips per block group, usinig the above function, and applied for each block group
+            date = run_date_sun
+            print(date)
+            try:
+                unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
+                print("Success")
+            except:
+                print("Failed")
+            output.append(unique_geoid)
+
+            date = run_date_sat
+            print(date)
+            try:
+                unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
+                print("Success")
+            except:
+                print("Failed")
+            output.append(unique_geoid)
+
+            date = run_date_wk
+            print(date)
+            try:
+                unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
+                print("Success")
+            except:
+                print("Failed")
+            output.append(unique_geoid)
+            output.append(unique_geoid)
+            output.append(unique_geoid)
+            output.append(unique_geoid)
+            output.append(unique_geoid)
+
+
+            print(time.time() - start_time)
+
+            print("-----------------------------")
 
 
 
-            # try:
-            #     # loading in the GTFS data
-            #     gtfs = GTFS.load_zip(gtfs_path)
-            #
-            #     # converting the stops file into a geopandas point dataframe
-            #     stops_geometry = [Point(xy) for xy in zip(gtfs.stops.stop_lon, gtfs.stops.stop_lat)]
-            #     stops_gdf = gtfs.stops.drop(['stop_lon', 'stop_lat'], axis=1)
-            #     stops_gdf = gpd.GeoDataFrame(stops_gdf, crs="EPSG:4326", geometry=stops_geometry)
-            #
-            #     # spatial join block group to stop points
-            #     stops_geoid = gpd.sjoin(stops_gdf, gdf, op="within")[["stop_id","GEOID"]]
-            #
-            #     # getting a unique list of block groups that have stops
-            #     unique_geoid = pd.DataFrame(stops_geoid.GEOID.unique(), columns = ["GEOID"])
-            #
-            #     # looping over the 7 dates
-            #     for date in dates:
-            #
-            #         # compute number of trips per block group, usinig the above function, and applied for each block group
-            #         print(date)
-            #         try:
-            #             unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
-            #             print("Success")
-            #         except:
-            #             print("Failed - no stops on this date")
-            #
-            #         output.append(unique_geoid)
-            #
-            #     print("SUCCESS")
-            # #
-            # except:
-            #     print("FAILED - for some unknown reason")
-            #
-            # print(time.time() - start_time)
-            #
-            # print("-----------------------------")
 
+    # creating single dataframe for all outupts
+    output = pd.concat(output)
 
+    # group by block group, summing total trips
+    output = output.groupby(['GEOID']).sum()
 
+    # merging data to the total set of block groups
+    output = blocks.merge(output,how="outer",on="GEOID")
 
-    # # creating single dataframe for all outupts
-    # output = pd.concat(output)
-    #
-    # # group by block group, summing total trips
-    # output = output.groupby(['GEOID']).sum()
-    #
-    # # merging data to the total set of block groups
-    # output = blocks.merge(output,how="outer",on="GEOID")
-    #
-    # # filling in 0 to block groups without transit
-    # output = output.fillna(0)
-    #
-    # # updating column names
-    # output.columns = ["bg_id","score"]
-    #
-    # # add column for measure name
-    # output["score_key"] = output_measure_name
-    #
-    # # adding in a field for date
-    # output["date"] = str(gtfs_date)
-    #
-    # # saving output
+    # filling in 0 to block groups without transit
+    output = output.fillna(0)
+
+    # updating column names
+    output.columns = ["bg_id","score"]
+
+    # add column for measure name
+    output["score_key"] = output_measure_name
+
+    # adding in a field for date
+    output["date"] = str(gtfs_date.date())
+
+    print(output)
+
+    # saving output
     # output.to_csv(output_file_path, index = False)
 
 
