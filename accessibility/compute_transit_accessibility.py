@@ -6,6 +6,7 @@ def compute_region_date(region, date):
     # acc.transit_accessibility(region_in, date_in, "PM")
     # acc.transit_accessibility(region_in, date_in, "WE")
     acc.levelofservice(region, date)
+    # hello
     # return None
 
 # compute_region_date("New York", "2020-02-23")
