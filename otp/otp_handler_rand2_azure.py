@@ -109,7 +109,7 @@ if __name__ == '__main__':
     if period == 'MP':
         dt = datetime.datetime.strptime(date, '%Y-%m-%d')
         while True:
-            if dt.weekday() > 4:
+            if dt.weekday() != 3:
                 dt = dt + timedelta(days = 1)
             else:
                 o_date = dt.strftime('%Y-%m-%d')
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     elif period == 'WE':
         dt = datetime.datetime.strptime(date, '%Y-%m-%d')
         while True:
-            if dt.weekday() < 5:
+            if dt.weekday() != 5:
                 dt = dt + timedelta(days = 1)
             else:
                 o_date = dt.strftime('%Y-%m-%d')
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     elif period == 'PM':
         dt = datetime.datetime.strptime(date, '%Y-%m-%d')
         while True:
-            if dt.weekday() > 4:
+            if dt.weekday() != 3:
                 dt = dt + timedelta(days = 1)
             else:
                 o_date = dt.strftime('%Y-%m-%d')
@@ -225,6 +225,12 @@ if __name__ == '__main__':
     # # removing all the partitioned files
     for f in path_parts:
         os.remove(f)
+        
+    date_row = [o_date, period]
 
+    with open(config[region]['gtfs_static'] + '/run_dates.csv','a') as fd:
+        wr = csv.writer(fd, quoting=csv.QUOTE_ALL)
+        wr.writerow(row)
+        
     print (time.time() - start_time)
     sys.exit()
