@@ -106,34 +106,32 @@ if __name__ == '__main__':
     
     # converting the periods into dates and times
     # if run date falls on weekday/weekend, then it will look for the next weekend/weekday
+    
+    dt = datetime.datetime.strptime(date, '%Y-%m-%d')
+    while True:
+        if dt.weekday() != 3:
+            dt = dt + timedelta(days = 1)
+        else:
+            wk_date = dt.strftime('%Y-%m-%d')
+            break
+    dt = datetime.datetime.strptime(date, '%Y-%m-%d')
+    while True:
+        if dt.weekday() != 5:
+            dt = dt + timedelta(days = 1)
+        else:
+            we_date = dt.strftime('%Y-%m-%d')
+            break
+    
     if period == 'MP':
-        dt = datetime.datetime.strptime(date, '%Y-%m-%d')
-        while True:
-            if dt.weekday() != 3:
-                dt = dt + timedelta(days = 1)
-            else:
-                o_date = dt.strftime('%Y-%m-%d')
-                break
+        o_date = wk_date
         hr_lst = [7,8]
     
     elif period == 'WE':
-        dt = datetime.datetime.strptime(date, '%Y-%m-%d')
-        while True:
-            if dt.weekday() != 5:
-                dt = dt + timedelta(days = 1)
-            else:
-                o_date = dt.strftime('%Y-%m-%d')
-                break
+        o_date = we_date
         hr_lst = [10,11]
         
     elif period == 'PM':
-        dt = datetime.datetime.strptime(date, '%Y-%m-%d')
-        while True:
-            if dt.weekday() != 3:
-                dt = dt + timedelta(days = 1)
-            else:
-                o_date = dt.strftime('%Y-%m-%d')
-                break
+        o_date = wk_date
         hr_lst = [22,23]
     else:
         pass
@@ -226,11 +224,11 @@ if __name__ == '__main__':
     for f in path_parts:
         os.remove(f)
         
-    date_row = [o_date, period]
+    date_row = [date, wk_date, we_date]
 
-    with open(config[region]['gtfs_static'] + '/run_dates.csv','a') as fd:
+    with open(config[region]['otp_path'] + '/otp_run_dates.csv','a') as fd:
         wr = csv.writer(fd, quoting=csv.QUOTE_ALL)
-        wr.writerow(row)
+        wr.writerow(date_row)
         
     print (time.time() - start_time)
     sys.exit()
