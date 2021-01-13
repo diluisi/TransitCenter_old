@@ -226,7 +226,7 @@ if __name__ == '__main__':
         
     date_row = [date, wk_date, we_date]
 
-    with open(config[region]['otp_path'] + '/otp_run_dates.csv','a') as fd:
+    with open(outpath + '/otp_run_dates.csv','a') as fd:
         wr = csv.writer(fd, quoting=csv.QUOTE_ALL)
         wr.writerow(date_row)
         
