@@ -405,7 +405,7 @@ def fare(jsn, region, c):
     region: region of study (Boston, NY...)
     '''  
     # Region validation
-    valid_regions = {'Boston', 'New York', 'Chicago', 'Washington DC', 'San Francisco', 'Philadelphia'}
+    valid_regions = {'Boston', 'New York', 'Chicago', 'District of Columbia', 'San Francisco-Oakland', 'Philadelphia','Los Angeles'}
     if region not in valid_regions:
         # if region is not valid
         raise ValueError("results: Region must be one of %r." % valid_regions)
