@@ -95,13 +95,13 @@ class FileConfig():
 
         # Transit Feeds Key
         config['API'] = {}
-        config['API']['key'] = None
+        config['API']['key'] = 'f2a91a7e-154d-434a-8083-2cd18e25f3d2'
 
         config['General'] = {}
         config['General']['county_ids'] = path + '/data/General/county_ids.csv' 
         config['General']['us_osm'] = path + '/data/General/us-latest.osm.pbf' 
-        config['General']['transit_feeds'] = 'Boston, New York, Philadelphia, District of Columbia, Chicago, Los Angeles'
-        config['General']['transit_land'] = 'San Francisco-Oakland'
+        config['General']['transit_feeds'] = 'Boston, Philadelphia, District of Columbia, Chicago, Los Angeles'
+        config['General']['transit_land'] = 'San Francisco-Oakland, New York'
         config['General']['gen'] = path + '/data/General' 
         config['General']['otp_input'] = path + '/otp/otp_input'
         config['General']['otp'] = path + '/otp'
@@ -135,15 +135,8 @@ class FileConfig():
             # OTP
             config[REGION]['graphs'] = path + '/data/' + REGION + '/otp/graphs'  
             config[REGION]['itinerary'] = path + '/data/' + REGION + '/otp/itinerary' 
-            config[REGION]['premium_routes'] = None
-        
-        config['Boston']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'
-        config['New York']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
-        config['Philadelphia']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
-        config['Chicago']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
-        config['District of Columbia']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
-        config['Los Angeles']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'  
-        config['San Francisco-Oakland']['low_cost_modes'] = 'BUS,TRAM,SUBWAY'      
+
+          
 
     def export_config(self, config_file=CONFIG_FILE_NAME):
         """Exports configuration file as *.cfg
