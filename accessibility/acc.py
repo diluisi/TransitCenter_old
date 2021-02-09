@@ -54,6 +54,9 @@ def levelofservice(region, gtfs_date):
     # static GTFS folder
     gtfs_folder = "data/" + region + "/input/gtfs/gtfs_static/feeds_" + gtfs_date
 
+    # file for dates when OTP was run
+    otp_run_path = "data/" + region + "/otp/otp_run_dates.csv"
+
     # output_file_path
     output_file_path = "data/" + region + "/output/" + "measures_" + gtfs_date + "_" + "LOS" + ".csv"
 
@@ -62,24 +65,14 @@ def levelofservice(region, gtfs_date):
     print(output_measure_name)
 
 
-    # get a list the 7 dates for analysis
-    gtfs_date = datetime.datetime.strptime(gtfs_date, '%Y-%m-%d')
-    # dates = []
-    # i = 0
-    # while i < 4:
-    #     date = gtfs_date.date() - datetime.timedelta(days=i)
-    #     dates.append(date)
-    #     i += 1
-    # i = 1
-    # while i < 4:
-    #     date = gtfs_date.date() + datetime.timedelta(days=i)
-    #     dates.append(date)
-    #     i += 1
+    # get the dates to compute the metric
+    otp_run = pd.read_csv(otp_run_path)
+    otp_run = otp_run[otp_run["folder_date"] == gtfs_date]
 
-    # while i < 7:
-    #     date = gtfs_date.date() - datetime.timedelta(days=i)
-    #     dates.append(date)
-    #     i += 1
+
+    # the two dates for running the metric
+    gtfs_date_wkd = datetime.datetime.strptime(otp_run["run_date_weekday"].item(), '%Y-%m-%d')
+    gtfs_date_sat = datetime.datetime.strptime(otp_run["run_date_saturday"].item(), '%Y-%m-%d')
 
 
     # crs dictionary needed for polygon buffering
@@ -112,7 +105,8 @@ def levelofservice(region, gtfs_date):
         return n_trips
 
     # empty output list
-    output = []
+    output_sat = []
+    output_wkd = []
 
     # loop over GTFS files
     for filename in os.listdir(gtfs_folder):
@@ -136,69 +130,25 @@ def levelofservice(region, gtfs_date):
             # getting a unique list of block groups that have stops
             unique_geoid = pd.DataFrame(stops_geoid.GEOID.unique(), columns = ["GEOID"])
 
-            # gtfs_date  first_date:
-            #     gtfs_date.date() + datetime.timedelta(days=7)
-
-            summary = gtfs.summary()
-            first_date = summary["first_date"]
-            last_date = summary["last_date"]
-            run_date_sat = gtfs_date.date() + datetime.timedelta(days=6)
-            run_date_sun = gtfs_date.date()
-            run_date_wk = gtfs_date.date() + datetime.timedelta(days=3)
-
-            print(first_date,last_date)
-            print(gtfs_date)
-
-            while run_date_wk < first_date:
-                run_date_wk = run_date_wk + datetime.timedelta(days=7)
-            while run_date_sat < first_date:
-                run_date_sat = run_date_sat + datetime.timedelta(days=7)
-            while run_date_sun < first_date:
-                run_date_sun = run_date_sun + datetime.timedelta(days=7)
-
-            while run_date_wk > last_date:
-                run_date_wk = run_date_wk - datetime.timedelta(days=7)
-            while run_date_sat > last_date:
-                run_date_sat = run_date_sat - datetime.timedelta(days=7)
-            while run_date_sun > last_date:
-                run_date_sun = run_date_sun - datetime.timedelta(days=7)
-
-            # if veterans day
-            if run_date_wk == datetime.datetime.strptime("2020-11-11", '%Y-%m-%d').date():
-                print("meow")
-                run_date_wk = run_date_wk + datetime.timedelta(days=1)
-
             # compute number of trips per block group, usinig the above function, and applied for each block group
-            date = run_date_sun
+            date = gtfs_date_sat
             print(date)
             try:
                 unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
                 print("Success")
             except:
                 print("Failed")
-            output.append(unique_geoid)
+            output_sat.append(unique_geoid)
 
-            date = run_date_sat
+            date = gtfs_date_wkd
             print(date)
             try:
                 unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
                 print("Success")
             except:
                 print("Failed")
-            output.append(unique_geoid)
+            output_wkd.append(unique_geoid)
 
-            date = run_date_wk
-            print(date)
-            try:
-                unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
-                print("Success")
-            except:
-                print("Failed")
-            output.append(unique_geoid)
-            output.append(unique_geoid)
-            output.append(unique_geoid)
-            output.append(unique_geoid)
-            output.append(unique_geoid)
 
 
             print(time.time() - start_time)
@@ -209,32 +159,43 @@ def levelofservice(region, gtfs_date):
 
 
     # creating single dataframe for all outupts
-    output = pd.concat(output)
+    output_sat = pd.concat(output_sat)
+    output_wkd = pd.concat(output_wkd)
 
     # group by block group, summing total trips
-    output = output.groupby(['GEOID']).sum()
+    output_sat = output_sat.groupby(['GEOID']).sum()
+    output_wkd = output_wkd.groupby(['GEOID']).sum()
+
 
     # merging data to the total set of block groups
-    output = blocks.merge(output,how="outer",on="GEOID")
+    output_sat = blocks.merge(output_sat,how="outer",on="GEOID")
+    output_wkd = blocks.merge(output_wkd,how="outer",on="GEOID")
 
     # filling in 0 to block groups without transit
-    output = output.fillna(0)
+    output_sat = output_sat.fillna(0)
+    output_wkd = output_wkd.fillna(0)
 
     # updating column names
-    output.columns = ["bg_id","score"]
+    output_sat.columns = ["bg_id","score"]
+    output_wkd.columns = ["bg_id","score"]
 
     # add column for measure name
-    output["score_key"] = output_measure_name
+    output_sat["score_key"] = "los_trips_WKD"
+    output_wkd["score_key"] = "los_trips_SAT"
 
     # adding in a field for date
-    output["date"] = str(gtfs_date.date())
+    output_sat["date"] = gtfs_date
+    output_wkd["date"] = gtfs_date
 
-    print(output)
+
+    output = pd.concat([output_wkd, output_sat])
+
+    output["score"] = output["score"] / 24
 
     # saving output
-    # output.to_csv(output_file_path, index = False)
+    output.to_csv(output_file_path, index = False)
 
-
+    print("meow :)")
 
 
 
@@ -269,7 +230,7 @@ def transit_accessibility(region, date, period):
     start_time = time.time()
 
     # get complete list of block groups
-    dfo = pd.read_csv("data/" + region + "/input/boundary_data/" + "block_group_pts.csv")
+    dfo = pd.read_csv("data/" + region + "/input/boundary_data/" + "block_group_pts.csv", dtype=str)
     dfo = dfo[["GEOID"]]
 
     # get path to spatial boundaries of block groups
@@ -283,7 +244,7 @@ def transit_accessibility(region, date, period):
         spatial_data_file_path = spatial_boundaries,
         id_field = "GEOID"
     )
-    radius_poly["GEOID"] = radius_poly["GEOID"].astype(int)
+    radius_poly["GEOID"] = radius_poly["GEOID"].astype(str)
     dfint = dfint.merge(radius_poly, on = "GEOID")
     del radius_poly
     dfint["o_block"] = dfint["GEOID"]
@@ -309,7 +270,6 @@ def transit_accessibility(region, date, period):
     acc_config_region = pd.read_csv('accessibility/acc_config_regional.csv')
     acc_config_region = acc_config_region[acc_config_region["region"] == region]
     fare_threshold = float(acc_config_region["fare_threshold"])
-    print(fare_threshold + 0.01)
     fare_date = acc_config_region["fare_date"].iloc[0]
 
     # getting a neighbourds matrix
@@ -334,6 +294,9 @@ def transit_accessibility(region, date, period):
     del dfo["count"], dfo["area"], dfo["urgent_care_facilities"]
     dfo = dfo.fillna(0)
 
+    # load in supply data
+    dftemp = pd.read_csv("data/" + region + "/input/destination_data/employment.csv", dtype=str)
+
 
     # loading in the accessibility config file
     acc_config = pd.read_csv('accessibility/acc_config.csv')
@@ -343,8 +306,6 @@ def transit_accessibility(region, date, period):
     impedences_times = acc_config[acc_config["type_code"] != "M"]
     impedences_times =  impedences_times[["function_name","function","cost","params","fare"]]
     impedences_times = impedences_times.drop_duplicates()
-
-    print(impedences_times)
 
     # access_measures
     access_measures = acc_config
@@ -379,18 +340,25 @@ def transit_accessibility(region, date, period):
         period_access = "AM"
 
     # load in the fares data for this time period
-    dff = pd.read_csv("data/" + region + "/otp/itinerary/fares/" + fare_date + "/period_" + period_times + ".csv", dtype=str)
+    dff = pd.read_csv("data/" + region + "/otp/itinerary/fares/" + fare_date + "/period_" + period_times + ".csv", dtype={'origin_block': str, 'destination_block': str, 'fare_all': float, 'fare_lowcost': float})
     dff = dff[["origin_block","destination_block","fare_all","fare_lowcost"]]
     dff = dff.rename(columns = {"origin_block":"o_block"})
     dff = dff.rename(columns = {"destination_block":"d_block"})
 
-    dff["fare_all"] = dff["fare_all"].round(2)
-    dff["fare_lowcost"] = dff["fare_lowcost"].round(2)
+    # take the fare data into rounded floats for saving space
+    # dff["fare_all"] = dff["fare_all"].astype(float)
+    # dff["fare_lowcost"] = dff["fare_lowcost"].astype(float)
+    dff["fare_all"] = dff["fare_all"].round(1)
+    dff["fare_lowcost"] = dff["fare_lowcost"].round(1)
 
+    print("n fares:", dff.shape[0])
 
     # creating the output dataframe
     dfout_P = pd.DataFrame(columns=['GEOID', 'measure', 'value'])
     dfout_M = pd.DataFrame(columns=['GEOID', 'measure', 'value'])
+
+    print("number of chunks:", len(geoid_chunks))
+    print("chunk size", n_chunks)
 
     # loop over the (8 or 2) travel time matrices in the study period (e.g. in AM, PM, WE)
     i = 0
@@ -401,10 +369,12 @@ def transit_accessibility(region, date, period):
             travel_time_matrix = os.path.join(directory, filename)
             i += 1
 
-            print(travel_time_matrix)
+            print("input time matrix", travel_time_matrix)
 
             # read in the travel time matrix
             dftall = pd.read_csv(travel_time_matrix, dtype=str)
+
+            print("n times:", dftall.shape[0])
 
             # looping over chunks
             i = 0
@@ -417,6 +387,9 @@ def transit_accessibility(region, date, period):
 
                 # subset the full matrix by this set of geoids
                 dft = dftall[dftall.o_block.isin(geoids)]
+
+                dft["time_all"] = dft["time_all"].astype(float)
+                dft["time_lowcost"] = dft["time_lowcost"].astype(float)
 
                 # filling Na values with a large travel time
                 dft = dft.fillna(9999)
@@ -823,7 +796,7 @@ def transit_accessibility(region, date, period):
                 i = i + 1
 
 
-                # break for testing
+                # # break for testing
                 # break
 
 
@@ -833,9 +806,12 @@ def transit_accessibility(region, date, period):
 
 
 
+
     # average over the multiple time periods
+    dfout_P["value"] = dfout_P["value"].astype(float)
+    dfout_M["value"] = dfout_M["value"].astype(float)
     dfout_P = dfout_P.groupby(['GEOID', 'measure'], as_index=False).mean()
-    # dfout_M = dfout_M.groupby(['GEOID', 'measure'], as_index=False).mean()
+    dfout_M = dfout_M.groupby(['GEOID', 'measure'], as_index=False).mean()
 
 
     # setting anything with less than -1 to -1
@@ -875,6 +851,7 @@ def transit_accessibility(region, date, period):
     dfout_transit.rename(columns = {'value_transit':'value'}, inplace = True)
 
     # creating the measures as a ratio to auto times
+    dfout["value"] = dfout["value"].astype(float)
     dfout["value"] = dfout["value_transit"] / dfout["value"]
     dfout["measure"] = dfout["variable"] + "_autoY_" + dfout["fare_info"]
     del dfout["variable"]
@@ -889,6 +866,9 @@ def transit_accessibility(region, date, period):
 
     # anything less than 0 to the -1 flag
     dfout.loc[dfout['value'] < 0, 'value'] = -1
+
+    # round value outputs
+    dfout["value"] = dfout["value"].round(1)
 
     # updating column names
     dfout = dfout.rename(columns = {"GEOID":"bg_id"})
@@ -937,6 +917,8 @@ def auto_accessibility(region, input_matrix):
     # --------accessibility_chunks_WE/
 
 
+    # mkdir accessibility_chunks_AM accessibility_chunks_PM accessibility_chunks_WE
+
     start_time = time.time()
 
 
@@ -948,13 +930,21 @@ def auto_accessibility(region, input_matrix):
     # zones with weird data that we need to smooth that didnt come up originally:
     also_missing = {
         "New York": [360610020001,360610020002,360050516005,360050504001,360610001001],
-        "Boston": []
+        "Boston": [],
+        "Chicago": [170319800001],
+        "District of Columbia": [],
+        "Philadelphia": [],
+        "San Francisco-Oakland": [],
+        "Los Angeles": ["061110074053","061110001001"]
     }
     also_missing = also_missing[region]
 
+    print(also_missing)
+    #
 
     # load in supply data
     dftemp = pd.read_csv("data/" + region + "/input/destination_data/employment.csv", dtype=str)
+
     dfo = pd.merge(dfo,dftemp, how='left', left_on="GEOID", right_on="block_group_id")
     for dataset in ["groceries_snap.csv","healthcare.csv","education.csv","greenspace.csv"]:
         dftemp = pd.read_csv("data/" + region + "/input/destination_data/" + dataset, dtype=str)
@@ -1024,8 +1014,49 @@ def auto_accessibility(region, input_matrix):
     # load in the full matrix
     dftall = pd.read_csv("data/" + region + "/input/auto_travel_times/" + input_matrix + ".csv.gzip", compression = "gzip", dtype=str)
 
+    dftall["Total_Time"] = dftall["Total_Time"].astype(float)
+    dftall["Total_Time"] = dftall["Total_Time"].astype(int)
+
+
+
+    # adding in extra data for LA
+    if region == "Los Angeles":
+
+        dftextra1 = pd.read_csv("data/" + region + "/input/auto_travel_times/" + input_matrix + "_30toN.csv", dtype=str)
+
+        dftextra2 = pd.read_csv("data/" + region + "/input/auto_travel_times/" + input_matrix + "_Nto30.csv", dtype=str)
+
+        dftextra = pd.concat([dftextra1,dftextra2])
+
+        del dftextra1, dftextra2
+
+        # correcting columns
+        dftextra["Total_Time"] = dftextra["Total_TravelTime"].astype(float)
+        dftextra["Total_Time"] = dftextra["Total_Time"].astype(int)
+        dftextra["OriginName"] = dftextra['Name'].str[:11]
+        dftextra["DestinationName"] = dftextra['Name'].str[-11:]
+
+        dftextra = dftextra.loc[:,["Total_Time","OriginName","DestinationName"]]
+
+        dftall = pd.concat([dftall,dftextra])
+
+        del dftextra
+
+
+
+
+
+    if region == "Los Angeles" or region == "San Francisco-Oakland":
+
+        dftall["OriginName"] = "0" + dftall["OriginName"]
+
+
+
+    # # print total zones from spatial file
+    print("Total zones:", len(neighbours))
+
     # # checking how many unique
-    print("Total Origins: ",len(pd.unique(dftall['OriginName'])))
+    print("Total Origins in matrix: ",len(pd.unique(dftall['OriginName'])))
 
     # printing number of chunks to output
     print("Total Chunks: ", len(geoid_chunks))
@@ -1050,7 +1081,11 @@ def auto_accessibility(region, input_matrix):
         # convert times to float
         dft["Total_Time"] = dft["Total_Time"].astype(float)
 
-        print("meow")
+
+        if region == "Los Angeles" or region == "San Francisco-Oakland":
+
+            dft["DestinationName"] = "0" + dft["DestinationName"]
+
 
         # set all intrazonal times to 0
         dft.loc[dft['OriginName'] == dft["DestinationName"], 'Total_Time'] = -1
@@ -1067,6 +1102,8 @@ def auto_accessibility(region, input_matrix):
         for extra_missing in also_missing:
             if extra_missing in geoids:
                 missing.append(extra_missing)
+
+        print(missing)
 
         if len(missing) >= 1:
 
@@ -1165,7 +1202,6 @@ def auto_accessibility(region, input_matrix):
         # convert to a tracc costs object
         dft = tracc.costs(dft)
 
-
         # loop over acc config file, computing all impedences
         for index, row in impedences.iterrows():
 
@@ -1253,9 +1289,43 @@ def auto_accessibility(region, input_matrix):
         i += 1
 
 
+def auto_accessibility_matrix_test(region,input_matrix):
+
+    dftall = pd.read_csv("data/" + region + "/input/auto_travel_times/" + input_matrix + ".csv.gzip", compression = "gzip", dtype=str)
+
+    if region == "Los Angeles" or region == "San Francisco-Oakland":
+
+        dftall["OriginName"] = "0" + dftall["OriginName"]
 
 
+    test = dftall['OriginName'].value_counts().to_frame()
 
+    print(test)
+
+    test.to_csv("test2.csv")
+
+
+def auto_accessibility_join_single(region, period):
+
+    """
+    takes chunks of auto accessibility results and combines them into a single files
+
+    for only one time period
+    """
+
+
+    data_dir = "data/" + region + "/input/auto_travel_times/accessibility_chunks_" + period
+
+    dfs = []
+    for filename in os.listdir(data_dir):
+        if filename.endswith(".csv"):
+            df = pd.read_csv(data_dir + "/" + filename, dtype=str)
+            dfs.append(df)
+    dfs = pd.concat(dfs)
+
+    print(dfs)
+
+    dfs.to_csv("data/" + region + "/input/auto_travel_times/test.csv")
 
 
 def auto_accessibility_join(region):
