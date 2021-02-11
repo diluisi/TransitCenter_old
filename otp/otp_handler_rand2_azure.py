@@ -112,7 +112,11 @@ if __name__ == '__main__':
         if dt.weekday() != 3:
             dt = dt + timedelta(days = 1)
         else:
+
             wk_date = dt.strftime('%Y-%m-%d')
+
+            pm_dt = dt + timedelta(days = 1)
+            pm_date = pm_dt.strftime('%Y-%m-%d')
             break
     dt = datetime.datetime.strptime(date, '%Y-%m-%d')
     while True:
@@ -121,7 +125,8 @@ if __name__ == '__main__':
         else:
             we_date = dt.strftime('%Y-%m-%d')
             break
-    
+
+    # Legacy Periods
     if period == 'MP':
         o_date = wk_date
         hr_lst = [7,8]
@@ -133,8 +138,66 @@ if __name__ == '__main__':
     elif period == 'PM':
         o_date = wk_date
         hr_lst = [22,23]
+
+    # These new periods are to account for the server being on UTC time
+    elif: period == 'EST_MP'
+        o_date = wk_date
+        hr_lst = [12,13]
+    elif: period == 'EDT_MP'
+        o_date = wk_date
+        hr_lst = [11,12]
+    elif: period == 'CST_MP'
+        o_date = wk_date
+        hr_lst = [13,14]
+    elif: period == 'CDT_MP'
+        o_date = wk_date
+        hr_lst = [12,13]
+    elif: period == 'PST_MP'
+        o_date = wk_date
+        hr_lst = [15,16]
+    elif: period == 'PDT_MP'
+        o_date = wk_date
+        hr_lst = [14,15]
+
+    elif: period == 'EST_PM'
+        o_date = pm_date
+        hr_lst = [3,4]
+    elif: period == 'EDT_PM'
+        o_date = pm_date
+        hr_lst = [2,3]
+    elif: period == 'CST_PM'
+        o_date = pm_date
+        hr_lst = [4,5]
+    elif: period == 'CDT_PM'
+        o_date = pm_date
+        hr_lst = [3,4]
+    elif: period == 'PST_PM'
+        o_date = pm_date
+        hr_lst = [6,7]
+    elif: period == 'PDT_PM'
+        o_date = pm_date
+        hr_lst = [5,6]
+
+    elif: period == 'EST_WE'
+        o_date = we_date
+        hr_lst = [15,16]
+    elif: period == 'EDT_WE'
+        o_date = we_date
+        hr_lst = [14,15]
+    elif: period == 'CST_MP'
+        o_date = we_date
+        hr_lst = [16,17]
+    elif: period == 'CDT_MP'
+        o_date = we_date
+        hr_lst = [15,16]
+    elif: period == 'PST_MP'
+        o_date = we_date
+        hr_lst = [18,19]
+    elif: period == 'PDT_MP'
+        o_date = we_date
+        hr_lst = [17,18]
     else:
-        pass
+        print(period)
     
     # adding the directories to save the file into
     os.makedirs(outpath + '/' + 'travel_times', exist_ok=True)
