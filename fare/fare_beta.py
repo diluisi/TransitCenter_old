@@ -394,9 +394,16 @@ def transfer_update(rules_id_true,leg_item,leg_duration,flag,transfer_list,curre
     #update valid rules        
     for i in range(len(tnsfr_lst)):
         if ((tnsfr_lst[i][1] <= 0) or (tnsfr_lst[i][2] <= 0)):
-            rl_id_true.remove(tnsfr_lst[i][0])
-            tnsfr_lst.remove(tnsfr_lst[i])
-            flag = 0            
+            tnsfr_lst[i][6] = False
+            flag = 0
+    
+    # list update
+    tnsfr_lst = [s for s in tnsfr_lst if s[6]==True]
+    updt = []
+    for i in tnsfr_lst:
+        updt.append(tnsfr_lst[0])
+    rl_id_true = updt
+            
     return tnsfr_lst, flag, cost, rl_id_true
 
 def fare(jsn, region, c):
