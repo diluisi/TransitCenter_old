@@ -401,7 +401,7 @@ def transfer_update(rules_id_true,leg_item,leg_duration,flag,transfer_list,curre
     tnsfr_lst = [s for s in tnsfr_lst if s[6]==True]
     updt = []
     for i in tnsfr_lst:
-        updt.append(tnsfr_lst[0])
+        updt.append(i[0])
     rl_id_true = updt
             
     return tnsfr_lst, flag, cost, rl_id_true
