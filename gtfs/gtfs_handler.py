@@ -38,6 +38,9 @@ class utility:
         feed_id = str(feed_id_lookup[feed_id_lookup['transit_land'] == transit_land_id]['feed_id'].iloc[0])
         return feed_id
 
+class APITimeoutException(Exception):
+     pass
+
 class get:
 
     def transit_land(region, input_date, xmin, xmax, ymin, ymax):
@@ -57,8 +60,12 @@ class get:
                 "bbox": str(xmin) + "," + str(ymin) + "," + str(xmax) + "," + str(ymax) # from the previous section
             }
         )
-        all_operators_json = response.json()
-        all_operators_json = all_operators_json["operators"]
+        
+        try:
+            all_operators_json = response.json()
+            all_operators_json = all_operators_json["operators"]
+        except:
+            raise APITimeoutException('API Timed Out')
             
         # loop over operators, adding unique feed info (based on onestop_id) to a list
         
@@ -131,7 +138,7 @@ class get:
                                 try:
                                     shutil.unpack_archive(dir_name + '.zip', dir_name)
                 
-                                    stops = pd.read_csv(dir_name + '/stops.txt')
+                                    stops = pd.read_csv(dir_name + '/stops.txt', dtype={'stop_id': str})
                                     try:
                                         os.remove(dir_name + '/pathways.txt')
                                     except:
@@ -287,8 +294,10 @@ class get:
 
                 }
             )
-            
-            feeds = response.json()['results']['feeds']
+            try:
+                feeds = response.json()['results']['feeds']
+            except:
+                raise APITimeoutException('API Timed Out')
 
             for agencies in feeds:
                 ts = agencies['latest']['ts']
@@ -335,7 +344,7 @@ class get:
                     try:
                         shutil.unpack_archive(dir_name + '.zip', dir_name)
     
-                        stops = pd.read_csv(dir_name + '/stops.txt')
+                        stops = pd.read_csv(dir_name + '/stops.txt', dtype={'stop_id': str})
                         stop_times = pd.read_csv(dir_name + '/stop_times.txt')
                         
                         try:
@@ -632,7 +641,10 @@ class get:
                 }
             )
             
-            feeds = response.json()['results']['feeds']
+            try:
+                feeds = response.json()['results']['feeds']
+            except:
+                raise APITimeoutException('API Timed Out')
 
             for agencies in feeds:
                 if agencies['id'] in list(banned['transit_feeds_id']):
@@ -670,7 +682,7 @@ class get:
                         try:
                             shutil.unpack_archive(dir_name + '.zip', dir_name)
         
-                            stops = pd.read_csv(dir_name + '/stops.txt')
+                            stops = pd.read_csv(dir_name + '/stops.txt', dtype={'stop_id': str})
                             try:
                                 os.remove(dir_name + '/pathways.txt')
                             except:

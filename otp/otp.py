@@ -18,6 +18,9 @@ if os.path.isfile('config.cfg'):
 else:
     config = configparser.ConfigParser()
     config.read('../config.cfg')
+    
+class gtfsException(Exception):
+     pass
 
 class build:
     
@@ -76,6 +79,27 @@ class build:
             if ".zip" in file:
                 move(config['General']['otp_input'] + '/' + file, config[region]['gtfs_static'] + "/feeds_" + input_date+'/' + file)
         
+        size = os.stat(config[region]['gtfs_static'] + "/feeds_" + input_date+'/' + file).st_size
+        
+        if size < 100000000: # graph files are always larger than 100
+            
+            with open('build_otp_log.txt', 'r') as f:
+                raw_data = f.read().split('\n')
+            raw_data.reverse()
+            
+            
+            i = 0
+
+            while True:
+                
+                i = i + 1
+                
+                if raw_data[i].split()[2] == '(GtfsModule.java:163)':
+                    row = raw_data[i]
+                    break
+            error_feed = row.split('/')[-1]
+            
+            raise gtfsException(error_feed + ' is not a valid feed.\n Consider removing the feed or choose a new date with a valid feed')
             
         return last_line
 
