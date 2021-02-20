@@ -83,7 +83,7 @@ class build:
         
         if size < 100000000: # graph files are always larger than 100
             
-            with open('build_otp_log.txt', 'r') as f:
+            with open(config['General']['otp'] + '/build_otp_log.txt', 'r') as f:
                 raw_data = f.read().split('\n')
             raw_data.reverse()
             
