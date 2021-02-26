@@ -486,15 +486,30 @@ def fare(jsn, region, c):
                     previous_route_id       = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['routeId'].split(':')[1].lower() #ok
                     previous_stop_id        = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['from']['stopId'].split(':')[1].lower() #ok
                     
-                    next_agency_name        = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['agencyName'].lower() #ok
-                    # Verify agencies with Null agency Id
-                    if next_agency_name in MISSING_AGENCY_ID:
-                        next_agency_id      = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['agencyName'].lower() #ok
+                    
+                    fare_type_id = query_agency(previous_agency_id,previous_agency_name,region_id,previous_route_type)
+                    
+                    if fare_type_id == 2:
+                        next_agency_name    = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['agencyName'].lower() #ok
+                        # Verify agencies with Null agency Id
+                        if next_agency_name in MISSING_AGENCY_ID:
+                            next_agency_id = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['agencyName'].lower() #ok
+                        else:
+                            next_agency_id      = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['agencyId'].lower() #ok
+                        next_route_type         = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['routeType'] #ok
+                        next_route_id           = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['routeId'].split(':')[1].lower() #ok
+                        next_stop_id            = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['to']['stopId'].split(':')[1].lower() #ok
+                        distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['distance']
                     else:
-                        next_agency_id          = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['agencyId'].lower() #ok
-                    next_route_type         = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['routeType'] #ok
-                    next_route_id           = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['routeId'].split(':')[1].lower() #ok
-                    next_stop_id            = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['to']['stopId'].split(':')[1].lower() #ok
+                        next_agency_name        = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['agencyName'].lower() #ok
+                        # Verify agencies with Null agency Id
+                        if next_agency_name in MISSING_AGENCY_ID:
+                            next_agency_id      = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['agencyName'].lower() #ok
+                        else:
+                            next_agency_id          = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['agencyId'].lower() #ok
+                        next_route_type         = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['routeType'] #ok
+                        next_route_id           = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index+1]]['routeId'].split(':')[1].lower() #ok
+                        next_stop_id            = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['to']['stopId'].split(':')[1].lower() #ok
                     leg_duration            = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['duration']
                     distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['distance']
 
@@ -509,7 +524,10 @@ def fare(jsn, region, c):
                     previous_route_id       = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['routeId'].split(':')[1].lower() #ok
                     previous_stop_id        = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['from']['stopId'].split(':')[1].lower() #ok
                     distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['distance']
-                    if previous_route_type == 2: #if last leg is rail we need destination data
+                    
+                    fare_type_id = query_agency(previous_agency_id,previous_agency_name,region_id,previous_route_type)
+                    
+                    if fare_type_id == 2: #if last leg is rail we need destination data
                         next_agency_name    = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['agencyName'].lower() #ok
                         # Verify agencies with Null agency Id
                         if next_agency_name in MISSING_AGENCY_ID:
