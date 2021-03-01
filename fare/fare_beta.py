@@ -487,7 +487,7 @@ def fare(jsn, region, c):
                     previous_stop_id        = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['from']['stopId'].split(':')[1].lower() #ok
                     
                     
-                    fare_type_id = query_agency(previous_agency_id,previous_agency_name,region_id,previous_route_type)
+                    fare_type_id = query_agency(previous_agency_id,previous_agency_name,region_id,previous_route_type, c)
                     
                     if fare_type_id == 2:
                         next_agency_name    = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['agencyName'].lower() #ok
@@ -525,7 +525,7 @@ def fare(jsn, region, c):
                     previous_stop_id        = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['from']['stopId'].split(':')[1].lower() #ok
                     distance                = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['distance']
                     
-                    fare_type_id = query_agency(previous_agency_id,previous_agency_name,region_id,previous_route_type)
+                    fare_type_id = query_agency(previous_agency_id,previous_agency_name,region_id,previous_route_type,c)
                     
                     if fare_type_id == 2: #if last leg is rail we need destination data
                         next_agency_name    = jsn['OTP_itinerary_all']['plan']['itineraries'][0]['legs'][control_lst[leg_index]]['agencyName'].lower() #ok
