@@ -198,7 +198,7 @@ def query_region(region, c):
     else:
         return lst_qry[0][0]
 
-def query_static_fare(agency_id,route_type,region_id, c):
+def query_static_fare(agency_id,route_type,region_id, agency_name,c):
     '''
     Search flat fares.
     Flat fares are cost defined by agency on their websites. No variations per day, distance or zone.
@@ -221,8 +221,8 @@ def query_static_fare(agency_id,route_type,region_id, c):
     # conn = sqlite3.connect(DB_NAME)
     # c = conn.cursor()
     # query
-    c.execute("SELECT * FROM StaticFare WHERE agency_id=:ag_id AND route_type=:r_tp AND region_id=:rg_id",
-              {'ag_id':agency_id,'r_tp':route_type,'rg_id':region_id})
+    c.execute("SELECT * FROM StaticFare WHERE agency_id=:ag_id AND route_type=:r_tp AND region_id=:rg_id AND agency_name=:ag_name",
+              {'ag_id':agency_id,'r_tp':route_type,'rg_id':region_id, 'ag_name': agency_name})
     lst_qry = c.fetchall()
     # conn.close()
     if not lst_qry:
@@ -453,7 +453,7 @@ def fare(jsn, region, c):
                 fare_type_id = query_agency(previous_agency_id,previous_agency_name,region_id,previous_route_type, c)
                 # Query for each type of fare
                 if fare_type_id == 1: #flat fare
-                    fare = query_static_fare(previous_agency_id,previous_route_type,region_id, c)
+                    fare = query_static_fare(previous_agency_id,previous_route_type,region_id, previous_agency_name,c)
                 elif fare_type_id == 2: # zonal fare
                     fare = query_zone_fare(previous_agency_id,previous_agency_name,region_id,previous_route_type,
                                     query_zone(previous_agency_id,previous_agency_name,region_id,previous_route_type,previous_stop_id, c),
@@ -549,7 +549,7 @@ def fare(jsn, region, c):
                             fare_type_id = query_agency(previous_agency_id,previous_agency_name,region_id,previous_route_type, c)
                             # Query for each type of fare
                             if fare_type_id == 1: # flat fare
-                                fare = query_static_fare(previous_agency_id,previous_route_type,region_id, c)
+                                fare = query_static_fare(previous_agency_id,previous_route_type,region_id, previous_agency_name,c)
                                 partial_cost.append(fare)
                                 transfer_list, flag, cost,rule_true = transfer_update(rule_true,leg_item,leg_duration,flag,transfer_list,next_agency_id,next_route_type,next_route_id,next_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, c)
                                 partial_cost.append(cost)
@@ -578,7 +578,7 @@ def fare(jsn, region, c):
                             fare_type_id = query_agency(previous_agency_id,previous_agency_name,region_id,previous_route_type, c)
                             # Query for each type of fare
                             if fare_type_id == 1:
-                                fare = query_static_fare(previous_agency_id,previous_route_type,region_id, c)
+                                fare = query_static_fare(previous_agency_id,previous_route_type,region_id, previous_agency_name,c)
                                 partial_cost.append(fare)
                             elif fare_type_id == 2:
                                 
