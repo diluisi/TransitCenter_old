@@ -230,7 +230,7 @@ def query_static_fare(agency_id,route_type,region_id, agency_name,c):
     else:
         return lst_qry[0][3]
 
-def query_transfer_rules(current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, c):
+def query_transfer_rules(current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id,current_agency_name,previous_agency_name,c):
     '''
     Search for transfer rules
     Return rule if exists.
@@ -252,8 +252,8 @@ def query_transfer_rules(current_agency_id,current_route_type,current_route_id,c
     # conn = sqlite3.connect(DB_NAME)
     # c = conn.cursor()
     # query
-    c.execute("SELECT * FROM TransferRules WHERE current_agency_id=:current_ag_id AND current_route_type=:current_rt_tp AND current_route_id=:current_rt_id AND current_stop_id=:current_st_id AND previous_agency_id=:previous_ag_id AND previous_route_type=:previous_rt_tp AND previous_route_id=:previous_rt_id AND previous_stop_id=:previous_st_id AND region_id=:rg_id",
-              {'current_ag_id':current_agency_id,'current_rt_tp':current_route_type,'current_rt_id':current_route_id,'current_st_id':current_stop_id,'previous_ag_id':previous_agency_id,'previous_rt_tp':previous_route_type,'previous_rt_id':previous_route_id,'previous_st_id':previous_stop_id,'rg_id':region_id})
+    c.execute("SELECT * FROM TransferRules WHERE current_agency_id=:current_ag_id AND current_route_type=:current_rt_tp AND current_route_id=:current_rt_id AND current_stop_id=:current_st_id AND previous_agency_id=:previous_ag_id AND previous_route_type=:previous_rt_tp AND previous_route_id=:previous_rt_id AND previous_stop_id=:previous_st_id AND region_id=:rg_id AND current_agency_name=:current_ag_name AND previous_agency_name=:previous_ag_name",
+              {'current_ag_id':current_agency_id,'current_rt_tp':current_route_type,'current_rt_id':current_route_id,'current_st_id':current_stop_id,'previous_ag_id':previous_agency_id,'previous_rt_tp':previous_route_type,'previous_rt_id':previous_route_id,'previous_st_id':previous_stop_id,'rg_id':region_id,'current_ag_name':current_agency_name, 'previous_ag_name':previous_agency_name})
     lst_qry = c.fetchall()
     # conn.close()
     if not lst_qry:
@@ -261,7 +261,7 @@ def query_transfer_rules(current_agency_id,current_route_type,current_route_id,c
     else:
         return lst_qry
     
-def lookup_transfer(current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, c):
+def lookup_transfer(current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id,current_agency_name,previous_agency_name,c):
     '''
     Search for transfer rules between agencies in four distinct levels:
         - agency level
@@ -287,13 +287,13 @@ def lookup_transfer(current_agency_id,current_route_type,current_route_id,curren
     (current/ previous) stop_id: GTFS stop identification
     '''    
     # stop level    
-    stop_level = query_transfer_rules(current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, c)
+    stop_level = query_transfer_rules(current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id,current_agency_name,previous_agency_name,c)
     # route level
-    route_level = query_transfer_rules(current_agency_id,current_route_type,current_route_id,'.',previous_agency_id,previous_route_type,previous_route_id,'.',region_id, c)
+    route_level = query_transfer_rules(current_agency_id,current_route_type,current_route_id,'.',previous_agency_id,previous_route_type,previous_route_id,'.',region_id,current_agency_name,previous_agency_name c)
     # mode level
-    mode_level = query_transfer_rules(current_agency_id,current_route_type,'.','.',previous_agency_id,previous_route_type,'.','.',region_id, c)
+    mode_level = query_transfer_rules(current_agency_id,current_route_type,'.','.',previous_agency_id,previous_route_type,'.','.',region_id,current_agency_name,previous_agency_name, c)
     # agency level
-    agency_level = query_transfer_rules(current_agency_id,'.','.','.',previous_agency_id,'.','.','.',region_id, c)
+    agency_level = query_transfer_rules(current_agency_id,'.','.','.',previous_agency_id,'.','.','.',region_id,current_agency_name,previous_agency_name, c)
     # list of all rules found
     transfer_control = [stop_level, route_level, mode_level, agency_level]
     
@@ -345,7 +345,7 @@ def rule_beautifier(leg_item,transfer_rules, transfer_list, rule_id_true):
                 #rules_choosed.append(transfer_list.index([j[0], j[9], j[10], j[11],leg_item,j[12],status]))
     return transfer_list, rule_id_true, rules_choosed 
 
-def transfer_update(rules_id_true,leg_item,leg_duration,flag,transfer_list,current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, c):   
+def transfer_update(rules_id_true,leg_item,leg_duration,flag,transfer_list,current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, current_agency_name,previous_agency_name,c):   
     '''
     Update fare rules.
     Return tnsfr_lst, flag, cost, rl_id_true
@@ -372,7 +372,7 @@ def transfer_update(rules_id_true,leg_item,leg_duration,flag,transfer_list,curre
         region_id: region of study (Boston, NY...)
     '''      
     # search for rules on TABLE: TRANSFER
-    transfer_rules = lookup_transfer(current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, c)
+    transfer_rules = lookup_transfer(current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, current_agency_name,previous_agency_name,c)
     # update list of rules
     tnsfr_lst, rl_id_true, rls_choosed = rule_beautifier(leg_item,transfer_rules, transfer_list,rules_id_true)
     # verify if list of rules is empty
@@ -551,14 +551,14 @@ def fare(jsn, region, c):
                             if fare_type_id == 1: # flat fare
                                 fare = query_static_fare(previous_agency_id,previous_route_type,region_id, previous_agency_name,c)
                                 partial_cost.append(fare)
-                                transfer_list, flag, cost,rule_true = transfer_update(rule_true,leg_item,leg_duration,flag,transfer_list,next_agency_id,next_route_type,next_route_id,next_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, c)
+                                transfer_list, flag, cost,rule_true = transfer_update(rule_true,leg_item,leg_duration,flag,transfer_list,next_agency_id,next_route_type,next_route_id,next_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id,next_agency_name,previous_agency_name,c)
                                 partial_cost.append(cost)
                             elif fare_type_id == 2: # zonal fares
                                 fare = query_zone_fare(previous_agency_id,previous_agency_name,region_id,previous_route_type,
                                                 query_zone(previous_agency_id,previous_agency_name,region_id,previous_route_type,previous_stop_id, c),
                                                 query_zone(previous_agency_id,previous_agency_name,region_id,previous_route_type,next_stop_id, c), c)
                                 partial_cost.append(fare)
-                                transfer_list, flag, cost,rule_true = transfer_update(rule_true,leg_item,leg_duration,flag,transfer_list,next_agency_id,next_route_type,next_route_id,next_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, c)
+                                transfer_list, flag, cost,rule_true = transfer_update(rule_true,leg_item,leg_duration,flag,transfer_list,next_agency_id,next_route_type,next_route_id,next_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id,next_agency_name,previous_agency_name,c)
                                 partial_cost.append(cost)
                             else:
                                 fare = 0
@@ -599,7 +599,7 @@ def fare(jsn, region, c):
                 else:
                     #se não for o último elemento da lista
                     if leg_index < (len(control_lst) - 1):
-                        transfer_list, flag, cost, rule_true = transfer_update(rule_true,leg_item,leg_duration,flag,transfer_list,next_agency_id,next_route_type,next_route_id,next_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id, c)
+                        transfer_list, flag, cost, rule_true = transfer_update(rule_true,leg_item,leg_duration,flag,transfer_list,next_agency_id,next_route_type,next_route_id,next_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id,next_agency_name,previous_agency_name,c)
                         partial_cost.append(cost) # append valor que retorna do transfer dict
                     # se for o último elemento da lista
                     else:
