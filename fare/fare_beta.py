@@ -32,8 +32,7 @@ import sqlite3
 # Database
 DB_NAME = 'FareDB.db'
 # List of agencies using NTD database
-EXCP = ["nj transit bus","nj transit rail", "long island rail road", "metro-north railroad", "shore line east",
-        "mnr hudson rail link","ny waterway","wmata"]
+EXCP = ["nj transit bus","nj transit rail", "long island rail road", "metro-north railroad", "shore line east","mnr hudson rail link","ny waterway","wmata"]
 # Some agencies have no agency id, we are replicating agency name as agency id for those cases
 MISSING_AGENCY_ID = ["septa","santa cruz metro","county connection","foothill transit","chicago transit authority","cecil transit","prince george’s county thebus"]
 
