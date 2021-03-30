@@ -287,7 +287,7 @@ def lookup_transfer(current_agency_id,current_route_type,current_route_id,curren
     # stop level    
     stop_level = query_transfer_rules(current_agency_id,current_route_type,current_route_id,current_stop_id,previous_agency_id,previous_route_type,previous_route_id,previous_stop_id,region_id,current_agency_name,previous_agency_name,c)
     # route level
-    route_level = query_transfer_rules(current_agency_id,current_route_type,current_route_id,'.',previous_agency_id,previous_route_type,previous_route_id,'.',region_id,current_agency_name,previous_agency_name c)
+    route_level = query_transfer_rules(current_agency_id,current_route_type,current_route_id,'.',previous_agency_id,previous_route_type,previous_route_id,'.',region_id,current_agency_name,previous_agency_name, c)
     # mode level
     mode_level = query_transfer_rules(current_agency_id,current_route_type,'.','.',previous_agency_id,previous_route_type,'.','.',region_id,current_agency_name,previous_agency_name, c)
     # agency level
