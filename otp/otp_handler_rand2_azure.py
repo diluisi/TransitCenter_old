@@ -140,72 +140,74 @@ if __name__ == '__main__':
         hr_lst = [22,23]
 
     # These new periods are to account for the server being on UTC time
-    elif: period == 'EST_MP'
+    elif period == 'EST_MP':
         o_date = wk_date
         hr_lst = [12,13]
-    elif: period == 'EDT_MP'
+    elif period == 'EDT_MP':
         o_date = wk_date
         hr_lst = [11,12]
-    elif: period == 'CST_MP'
+    elif period == 'CST_MP':
         o_date = wk_date
         hr_lst = [13,14]
-    elif: period == 'CDT_MP'
+    elif period == 'CDT_MP':
         o_date = wk_date
         hr_lst = [12,13]
-    elif: period == 'PST_MP'
+    elif period == 'PST_MP':
         o_date = wk_date
         hr_lst = [15,16]
-    elif: period == 'PDT_MP'
+    elif period == 'PDT_MP':
         o_date = wk_date
         hr_lst = [14,15]
 
-    elif: period == 'EST_PM'
+    elif period == 'EST_PM':
         o_date = pm_date
         hr_lst = [3,4]
-    elif: period == 'EDT_PM'
+    elif period == 'EDT_PM':
         o_date = pm_date
         hr_lst = [2,3]
-    elif: period == 'CST_PM'
+    elif period == 'CST_PM':
         o_date = pm_date
         hr_lst = [4,5]
-    elif: period == 'CDT_PM'
+    elif period == 'CDT_PM':
         o_date = pm_date
         hr_lst = [3,4]
-    elif: period == 'PST_PM'
+    elif period == 'PST_PM':
         o_date = pm_date
         hr_lst = [6,7]
-    elif: period == 'PDT_PM'
+    elif period == 'PDT_PM':
         o_date = pm_date
         hr_lst = [5,6]
 
-    elif: period == 'EST_WE'
+    elif period == 'EST_WE':
         o_date = we_date
         hr_lst = [15,16]
-    elif: period == 'EDT_WE'
+    elif period == 'EDT_WE':
         o_date = we_date
         hr_lst = [14,15]
-    elif: period == 'CST_MP'
+    elif period == 'CST_WE':
         o_date = we_date
         hr_lst = [16,17]
-    elif: period == 'CDT_MP'
+    elif period == 'CDT_WE':
         o_date = we_date
         hr_lst = [15,16]
-    elif: period == 'PST_MP'
+    elif period == 'PST_WE':
         o_date = we_date
         hr_lst = [18,19]
-    elif: period == 'PDT_MP'
+    elif period == 'PDT_WE':
         o_date = we_date
         hr_lst = [17,18]
     else:
-        print(period)
+        print('Invalid Period:' + period)
+
+    period_notz = period[-2:]
     
     # adding the directories to save the file into
     os.makedirs(outpath + '/' + 'travel_times', exist_ok=True)
     os.makedirs(outpath + '/' + 'travel_times/' + str(date), exist_ok=True)
-    os.makedirs(outpath + '/' + 'travel_times/' + str(date) + '/period' + period , exist_ok=True)
+    os.makedirs(outpath + '/' + 'travel_times/' + str(date) + '/period' + period_notz , exist_ok=True)
     
     # directory for the output path
-    json_path = outpath + '/' + 'travel_times/' + str(date) + '/period' + period 
+    json_path = outpath + '/' + 'travel_times/' + str(date) + '/period' + period_notz 
     
     # setting up the list of arguments for the otp function
     period_param = []

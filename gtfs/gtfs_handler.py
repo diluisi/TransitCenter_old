@@ -40,6 +40,8 @@ class utility:
 
 class APITimeoutException(Exception):
      pass
+class InvalidFeed(Exception):
+     pass
 
 class get:
 
@@ -89,31 +91,49 @@ class get:
             operator_website = feed_info[2]
             operator_metro = feed_info[4]
 
-            # get feed versions
-            response = requests.get(
-            "https://transit.land/api/v1/feed_versions",
-            params = {
-                "feed_onestop_id": feed_info[0],
-                "per_page": 999
-                }
-            )        
-            feeds = response.json()
-            sleep(1) # to avoid API timeout
+            for attempt in range(3):
+                try:
+                    # get feed versions
+                    response = requests.get(
+                    "https://transit.land/api/v1/feed_versions",
+                    params = {
+                        "feed_onestop_id": feed_info[0],
+                        "per_page": 1000
+                        }
+                    )        
+                    feeds = response.json()
+                    sleep(1) # to avoid API timeout
+
+                except:
+                    print('Attempt ' + str(attempt))
+                    if attempt == 3:
+                        raise APITimeoutException('API Timed Out after 4 Attempts')
+                    else:
+                    
+                        sleep(7**attempt)
+                    
             
             # if there are feeds, find the feed that is the most recent to the input date
             try:
+                
                 nfeeds = (len(feeds["feed_versions"]))
                 if nfeeds > 0:
+                    print(operator_name)
                     # looping over feed versions
                     i = nfeeds - 1
-                    while i >= 0: 
+                    while i >=0: 
                         # grabbing date info
                         date_fetched_iso8601 = feeds["feed_versions"][i]["fetched_at"]
+                        earliest_calendar_date = feeds["feed_versions"][i]["earliest_calendar_date"]
+                        
+                        earliest_date_str = str(earliest_calendar_date)[0:10]
+                        earliest_date_int = 10000 * int(earliest_date_str[0:4]) + 100 * int(earliest_date_str[5:7]) + int(earliest_date_str[8:10])
                         date_fetched = str(date_fetched_iso8601)[0:10]
-                        date_fetched_int = 10000 * int(date_fetched[0:4]) + 100 * int(date_fetched[5:7]) + int(date_fetched[8:10])
+                        #date_fetched_int = 10000 * int(date_fetched[0:4]) + 100 * int(date_fetched[5:7]) + int(date_fetched[8:10])
         
                         # checking if before the input date
-                        if date_fetched_int < input_date_int:
+                        print(earliest_date_int, input_date_int)
+                        if earliest_date_int < input_date_int:
                             
 
                             # output info
@@ -121,7 +141,8 @@ class get:
                             earliest_calendar_date = feeds["feed_versions"][i]["earliest_calendar_date"]
                             latest_calendar_date = feeds["feed_versions"][i]["latest_calendar_date"]
                             transitland_historical_url = feeds["feed_versions"][i]["download_url"]
-                            transit_land_id = feeds["feed_versions"][i]["feed"]                    
+                            transit_land_id = feeds["feed_versions"][i]["feed"]       
+                            feed_id = utility.feed_id_func(transit_land_id)             
                             
                             
                             
@@ -131,9 +152,15 @@ class get:
                                 name = operator_name
                                 feed_publisher_name = operator_name
 
-                                dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date +'-'+ str(counter)
+                                filename = feed_id
+                                filename = filename.replace('/', '_')
 
-                                urllib.request.urlretrieve(transitland_historical_url, dir_name + ".zip")
+                                dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + filename
+
+                                try:
+                                    urllib.request.urlretrieve(transitland_historical_url, dir_name + ".zip")
+                                except:
+                                    raise APITimeoutException('API Timed Out')
 
                                 try:
                                     shutil.unpack_archive(dir_name + '.zip', dir_name)
@@ -173,7 +200,7 @@ class get:
                                     feed_startdate = '20200101'
                                     feed_enddate = '20220101'
                                     feed_version = '1'
-                                    feed_id = utility.feed_id_func(transit_land_id)
+                                    
                                     feed_txt_lst.append(list([feed_publisher_name, feed_publisher_url, feed_lang, feed_startdate, feed_enddate, feed_version, feed_id]))
                                     feed_txt = pd.DataFrame(feed_txt_lst, columns = ['feed_publisher_name' , 'feed_publisher_url', 'feed_lang', 'feed_start_date', 'feed_end_date', 'feed_version','feed_id']) 
                                     feed_txt.to_csv(dir_name+'/feed_info.txt', index = False)
@@ -188,9 +215,10 @@ class get:
                                 sleep(1)
                                 
                             except:
+                                
                                 feed_id = None
                                 pass
-                            print(name)
+                            
                             output_feed_info.append([operator_name, operator_website, operator_metro, feed_id, onestop_id, date_fetched, earliest_calendar_date, latest_calendar_date, transitland_historical_url])
 
                             break # break since this should be the most recent
@@ -211,9 +239,9 @@ class get:
             print(name)
                         
             api_url = nice_url 
-            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" +  'nassau-inter-county-express_268' + ".zip"
             urllib.request.urlretrieve(nice_url, dir)
-            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
+            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + 'nassau-inter-county-express_268'
 
 
 
@@ -285,19 +313,24 @@ class get:
         # loops through all locations
         feed_info_lst = []
         
-        for ids in location_ids:
-
-                
+        for attempt in range(4):    
             response = s.get(
                 url+'/v1/getFeeds',
                 params = {'key': key, 'location' : ids, 'type': 'gtfs', 'limit': 200
 
                 }
             )
+            
             try:
                 feeds = response.json()['results']['feeds']
+                break
             except:
-                raise APITimeoutException('API Timed Out')
+                print('Attempt ' + attempt)
+                if attempt == 3:
+                    raise APITimeoutException('API Timed Out after 4 Attempts')
+                else:
+                
+                    time.sleep(7**attempt)
 
             for agencies in feeds:
                 ts = agencies['latest']['ts']
@@ -310,18 +343,21 @@ class get:
                 if agencies['id'] in ['nj-transit/408', 'nj-transit/409']:
                     continue
 
+                filename = agencies['id']
+                filename = filename.replace('/', '_')
+
                 for attempt in range(3):
                     try:
                         if attempt == 0:
                             
                             api_url = gtfs_url + agencies['id'] + '/' + dt_fetched + '/download'
-                            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+                            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + filename + ".zip"
                             urllib.request.urlretrieve(api_url, dir)
                             break
                         elif attempt == 1:
                             bkwd_dt = str((datetime.strptime(dt_fetched, '%Y%m%d') + timedelta(days=1)).date().strftime('%Y%m%d'))   
                             api_url = gtfs_url + agencies['id'] + '/' + bkwd_dt+ '/download'
-                            dir = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
+                            dir = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + filename + ".zip"
                             urllib.request.urlretrieve(api_url, dir)
                             dt_fetched = str((datetime.strptime(dt_fetched, '%Y%m%d') + timedelta(days=1)).date().strftime('%Y-%m-%d')) 
                             
@@ -329,7 +365,7 @@ class get:
                         elif attempt == 2:
                             fwd_dt = str((datetime.strptime(dt_fetched, '%Y%m%d') - timedelta(days=1)).date().strftime('%Y%m%d'))   
                             api_url = gtfs_url + agencies['id'] + '/' + fwd_dt + '/download'
-                            dir = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date + ".zip"
+                            dir = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + filename + ".zip"
                             urllib.request.urlretrieve(api_url, dir)
                             dt_fetched = str((datetime.strptime(dt_fetched, '%Y%m%d') - timedelta(days=1)).date().strftime('%Y-%m-%d'))   
                             break
@@ -338,7 +374,7 @@ class get:
                             break
                     except:
                         sleep(1)
-                dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
+                dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + filname 
                 
                 try:
                     try:
@@ -422,9 +458,9 @@ class get:
             print(name)
                         
             api_url = vre_url 
-            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + 'virginia-railway-express_250' + ".zip"
             urllib.request.urlretrieve(api_url, dir)
-            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
+            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + 'virginia-railway-express_250'
 
 
 
@@ -442,7 +478,7 @@ class get:
 
             feed_txt_lst = []
             feed_publisher_name = name
-            feed_publisher_url = name
+            feed_publisher_url = 'https://www.google.com'
             feed_lang = 'EN'
             feed_startdate = '20200101'
             feed_enddate = '20220101'
@@ -467,10 +503,9 @@ class get:
             print(name)
                         
             api_url = nice_url 
-            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + 'nassau-inter-county-express_268' + ".zip"
             urllib.request.urlretrieve(nice_url, dir)
-            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
-
+            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + 'nassau-inter-county-express_268' 
 
 
             try:          
@@ -512,9 +547,9 @@ class get:
             nj_rail_url =  'https://www.njtransit.com/rail_data.zip'
             print(name)            
             api_url = nj_rail_url 
-            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" +'nj-transit_408' + ".zip"
             urllib.request.urlretrieve(api_url, dir)
-            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
+            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" +'nj-transit_408' 
             # try:
             #     shutil.unpack_archive(dir_name + '.zip', dir_name)
             #     shutil.make_archive(dir_name , 'zip', dir_name +'/rail_data')
@@ -535,7 +570,7 @@ class get:
 
             feed_txt_lst = []
             feed_publisher_name = name
-            feed_publisher_url = name
+            feed_publisher_url = 'https://www.google.com'
             feed_lang = 'EN'
             feed_startdate = '20200101'
             feed_enddate = '20220101'
@@ -556,9 +591,9 @@ class get:
             nj_bus_url =  'https://www.njtransit.com/bus_data.zip'
             print(name)
             api_url = nj_bus_url 
-            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + 'nj-transit_409' + ".zip"
             urllib.request.urlretrieve(api_url, dir)
-            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
+            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + 'nj-transit_409' 
             # try:
             #     shutil.unpack_archive(dir_name + '.zip', dir_name)
             #     shutil.make_archive(dir_name , 'zip', dir_name +'/rail_data')
@@ -579,7 +614,7 @@ class get:
 
             feed_txt_lst = []
             feed_publisher_name = name
-            feed_publisher_url = name
+            feed_publisher_url = 'https://www.google.com'
             feed_lang = 'EN'
             feed_startdate = '20200101'
             feed_enddate = '20220101'
@@ -633,23 +668,32 @@ class get:
         
         for ids in location_ids:
 
-                
-            response = s.get(
-                url+'/v1/getFeeds',
-                params = {'key': key, 'location' : ids, 'type': 'gtfs', 'limit': 200
 
-                }
-            )
-            
-            try:
-                feeds = response.json()['results']['feeds']
-            except:
-                raise APITimeoutException('API Timed Out')
+            for attempt in range(4):    
+                response = s.get(
+                    url+'/v1/getFeeds',
+                    params = {'key': key, 'location' : ids, 'type': 'gtfs', 'limit': 200
+
+                    }
+                )
+                
+                try:
+                    feeds = response.json()['results']['feeds']
+                    break
+                except:
+                    print('Attempt ' + attempt)
+                    if attempt == 3:
+                        raise APITimeoutException('API Timed Out after 4 Attempts')
+                    else:
+                    
+                        time.sleep(7**attempt)
 
             for agencies in feeds:
                 if agencies['id'] in list(banned['transit_feeds_id']):
                     continue
 
+                filename = agencies['id']
+                filename = filename.replace('/', '_')
                 name = agencies['t']
                 loc = agencies['l']['t']                
                 dt_time = datetime.strptime(input_date, '%Y-%m-%d')
@@ -673,11 +717,11 @@ class get:
                 
                 if update == True:
                     api_url = gtfs_url + agencies['id'] + '/' + dt_fetched + '/download'
-                    dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+                    dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + filename + ".zip"
                     urllib.request.urlretrieve(api_url, dir)
     
     
-                    dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
+                    dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + filename
                     try:
                         try:
                             shutil.unpack_archive(dir_name + '.zip', dir_name)
@@ -706,7 +750,7 @@ class get:
         
                             feed_txt_lst = []
                             feed_publisher_name = name
-                            feed_publisher_url = name
+                            feed_publisher_url = 'https://www.google.com'
                             feed_lang = 'EN'
                             feed_startdate = '20200101'
                             feed_enddate = '20220101'
@@ -762,9 +806,9 @@ class get:
                     dt_time - dt_time - timedelta(days = 1)
                         
 
-            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + name + '-' + input_date + ".zip"
+            dir = config[region]['gtfs_static'] + "/feeds_"+ input_date + "/" + 'virginia-railway-express_250' + ".zip"
             urllib.request.urlretrieve(api_url, dir)
-            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + name + '-' + input_date 
+            dir_name = config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + 'virginia-railway-express_250' 
 
 
 
@@ -782,7 +826,7 @@ class get:
 
             feed_txt_lst = []
             feed_publisher_name = name
-            feed_publisher_url = name
+            feed_publisher_url = 'https://www.google.com'
             feed_lang = 'EN'
             feed_startdate = '20200101'
             feed_enddate = '20220101'
@@ -800,4 +844,54 @@ class get:
 
         feed_info = pd.DataFrame(feed_info_lst, columns = ['operator_name' , 'operator_url', 'operator_region', 'transit_feeds_id', 'date_fetched', 'earliest_calendar_date', 'latest_calendar_date', 'transitfeeds_url']) 
         feed_info.to_csv(config[region]['gtfs_static'] + "/feeds_" + input_date + "/" + region + "_feed_info_" + input_date + ".csv", index = False)
+        
+
+    def process_feeds(region, dir_name, name, feed_id):        
+
+        shutil.unpack_archive(dir_name + '.zip', dir_name)
+
+        stops = pd.read_csv(dir_name + '/stops.txt', dtype={'stop_id': str})
+        try:
+            os.remove(dir_name + '/pathways.txt')
+        except:
+            pass
+
+        try:
+            gtfs_file = GTFS.load_zip(dir_name + '.zip')
+            num_stops = gtfs_file.route_stops_inside(config[region]['region_boundary']).sum()[0]
+        except: 
+            num_stops = 2
+
+
+        if num_stops < 2:
+            os.remove(dir_name + '.zip')
+            os.remove(dir_name)
+            raise InvalidFeed('Invalid Feed')
+
+        for index, row in stops.iterrows():
+            if(pd.isnull(row['stop_lat'])):
+                stops.at[index, 'stop_lat'] = 0
+                stops.at[index, 'stop_lon'] = 0
+
+        try:
+            os.remove(dir_name + '/feed_info.txt')
+        except:
+            pass
+
+        feed_txt_lst = []
+        feed_publisher_name = name
+        feed_publisher_url = 'https://www.google.com'
+        feed_lang = 'EN'
+        feed_startdate = '20200101'
+        feed_enddate = '20220101'
+        feed_version = '1'
+
+        feed_txt_lst.append(list([feed_publisher_name, feed_publisher_url, feed_lang, feed_startdate, feed_enddate, feed_version, feed_id]))
+        feed_txt = pd.DataFrame(feed_txt_lst, columns = ['feed_publisher_name' , 'feed_publisher_url', 'feed_lang', 'feed_start_date', 'feed_end_date', 'feed_version','feed_id']) 
+        feed_txt.to_csv(dir_name+'/feed_info.txt', index = False)
+        stops.to_csv(dir_name+'/stops.txt', index = False)
+
+        shutil.make_archive(dir_name, 'zip', dir_name)
+
+        shutil.rmtree(dir_name)
     

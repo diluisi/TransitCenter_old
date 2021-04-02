@@ -56,6 +56,7 @@ pts_path = config[region]['tract_points']
 outpath = config[region]['itinerary']
 graph_path = config[region]['graphs']
 otp_path = config['General']['otp']
+block_path = config[region]['block_group_points'] 
 
 
 #reads the list of premium routes to ban
@@ -71,8 +72,8 @@ mode = 'TRANSIT'
 # shell command to start up otp server
 def call_otp():
     
-    command = ['java', '-Xmx4G', '-jar', otp_path+'/otp-1.4.0-shaded.jar', '--router', 'graphs-'+date,
-          '--graphs', graph_path, '--server', '--enableScriptingWebService', '--maxThreads', str(threads)]
+    command = ['java', '-Xmx208G', '-jar', otp_path+'/otp-1.4.0-shaded.jar', '--router', 'graphs-'+date,
+          '--graphs', graph_path, '--server', '--enableScriptingWebService']
     
     print('\njava -Xmx4G -jar ' + otp_path+'/otp-1.4.0-shaded.jar'+ ' --router '+ 'graphs-'+date+
           ' --graphs '+graph_path+' --server'+' --enableScriptingWebService\n')
@@ -146,7 +147,7 @@ def analyst(x, y):
     params = f'?toPlace={y},{x}&fromPlace={y},{x}&arriveBy=TRUE&mode={otp_mode}&date={date_us}&time={tm}&maxWalkDistance={walk_dist}'
     url = f'http://localhost:8080/otp/routers/graphs-'+date+'/isochrone'+params+cutoff
     response = requests.get(url)
-
+    print(url)
     return(response.json())
 
 if __name__ == '__main__':
@@ -169,6 +170,11 @@ if __name__ == '__main__':
 
     # load in the point file
     df_pts = pd.read_csv(pts_path)
+    df_block = pd.read_csv(block_path)
+    block_poly = gpd.read_file(config[region]['block_group_polygons'])
+    gdf_pts = gpd.GeoDataFrame(df_pts, geometry=gpd.points_from_xy(df_pts.LONGITUDE, df_pts.LATITUDE))
+
+
     
     #declaring variables
     output_lst = []
@@ -241,12 +247,7 @@ if __name__ == '__main__':
         y1 = row['LATITUDE']
         origin = int(row['GEOID'])
 
-        #for testing purposes, running a limited set
-        # if index > 2499:
-        #     break 
-        # if index < 4:
-        #     continue
-        #calling isochrones
+
         try:
             data = analyst(x1, y1)
         except:
@@ -255,12 +256,12 @@ if __name__ == '__main__':
             continue
         
         # filters out blocks with travel time over 90 minutes
-        iso_120 = gpd.GeoDataFrame.from_features(data["features"])
-        gdf_120 = gpd.sjoin(iso_120, gdf_pts, how="left")
-        df_120 = pd.DataFrame(gdf_120).reset_index()
+        iso = gpd.GeoDataFrame.from_features(data["features"])
+        gdf_blocks = gpd.sjoin(iso, block_poly, how="left", op = 'intersects')
+        tract_list = list(gdf_blocks['GEOID'].astype(str).str[:-1].astype(int).drop_duplicates())
+        df_120 = df_pts[df_pts['GEOID'].isin(tract_list)]
+        df_120 = pd.DataFrame(df_120).reset_index()
         df_120 = df_120.sample(frac=1).reset_index(drop=True)
-
-        df_pts = pd.read_csv(pts_path)
         
         dest_lst = []
         start = 0
@@ -346,17 +347,7 @@ if __name__ == '__main__':
                                 continue
                             
                             output_lst.append([origin, dest_lst[j], fare_cost, result[j]['plan']['itineraries'][0]['duration']])
-    
-                            # full = error_dict 
-                            # full['origin_tract'] = origin
-                            # full['destination_tract'] = dest_lst[j]
-                            # full['departure_datetime'] = str(tm)
-                            # full['fare_dict'] = fare_dict
-                            # full['traceback'] = traceback.format_exc()
-                            
-                            # full_json.append(dict(full))
-                            # full = ""
-                            # fare_lst.append(fare_dict)
+
     
     
                         except:
@@ -364,14 +355,44 @@ if __name__ == '__main__':
                             error_data['origin_tract'] = origin
                             error_data['destination_tract'] = dest_lst[j]
                             error_data['departure_datetime'] = str(tm)
-                            error_data['fare_dict'] = fare_dict
+                            error_data['fare_dict'] = result[j]
                             error_data['traceback'] = traceback.format_exc()
                             
                             error_json.append(dict(error_data))
                             error_data = ""
                             fare_error.append(fare_dict)
+                    else: 
+                        if dest_lst[j] == 0:
+                            pass
+                        else:
+                            error_data = error_dict 
+                            error_data['origin_tract'] = origin
+                            error_data['destination_tract'] = dest_lst[j]
+                            error_data['departure_datetime'] = str(tm)
+                            error_data['fare_dict'] = result[j]
+                            error_data['traceback'] = traceback.format_exc()
+                            
+                            error_json.append(dict(error_data))
+                            error_data = ""
+                            fare_error.append(fare_dict)
+                        
                 except:
                     pass
+                
+                # try:
+                #     full = error_dict 
+                #     full['origin_tract'] = origin
+                #     full['destination_tract'] = dest_lst[j]
+                #     full['departure_datetime'] = str(tm)
+                #     full['fare_dict'] = fare_dict
+                #     full['traceback'] = traceback.format_exc()
+                    
+                #     full_json.append(dict(full))
+                #     full = ""
+                #     fare_lst.append(fare_dict)
+                # except:
+                #     pass
+                
                 try:
                 
                 # low cost network 
@@ -388,25 +409,29 @@ if __name__ == '__main__':
                                 continue
                             
                             output_lst_lowcost.append([origin, dest_lst[j], fare_cost, result_lowcost[j]['plan']['itineraries'][0]['duration']])
-    
-                            # full = error_dict 
-                            # full['origin_tract'] = origin
-                            # full['destination_tract'] = dest_lst[j]
-                            # full['departure_datetime'] = str(tm)
-                            # full['fare_dict'] = fare_dict
-                            # full['traceback'] = traceback.format_exc()
-                            
-                            # full_json.append(dict(full))
-                            # full = ""
-                            # fare_lst.append(fare_dict)
-    
+
     
                         except:
                             error_data = error_dict 
                             error_data['origin_tract'] = origin
                             error_data['destination_tract'] = dest_lst[j]
                             error_data['departure_datetime'] = str(tm)
-                            error_data['fare_dict'] = fare_dict
+                            error_data['fare_dict'] = result_lowcost[j]
+                            error_data['traceback'] = traceback.format_exc()
+                            
+                            error_json.append(dict(error_data))
+                            error_data = ""
+                            fare_error.append(fare_dict)
+                    else:
+                        
+                        if dest_lst[j] == 0:
+                            pass
+                        else:
+                            error_data = error_dict 
+                            error_data['origin_tract'] = origin
+                            error_data['destination_tract'] = dest_lst[j]
+                            error_data['departure_datetime'] = str(tm)
+                            error_data['fare_dict'] = result_lowcost[j]
                             error_data['traceback'] = traceback.format_exc()
                             
                             error_json.append(dict(error_data))
@@ -414,6 +439,20 @@ if __name__ == '__main__':
                             fare_error.append(fare_dict)
                 except:
                     pass
+                # try:
+                #     full = error_dict 
+                #     full['origin_tract'] = origin
+                #     full['destination_tract'] = dest_lst[j]
+                #     full['departure_datetime'] = str(tm)
+                #     full['fare_dict'] = fare_dict
+                #     full['traceback'] = traceback.format_exc()
+                    
+                #     full_json.append(dict(full))
+                #     full = ""
+                #     fare_lst.append(fare_dict)
+    
+                # except:
+                #     pass
             
             if index%100 == 0:
                 output = pd.DataFrame(output_lst, columns = columns)
