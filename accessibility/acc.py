@@ -55,7 +55,7 @@ def levelofservice(region, gtfs_date):
     gtfs_folder = "data/" + region + "/input/gtfs/gtfs_static/feeds_" + gtfs_date
 
     # file for dates when OTP was run
-    otp_run_path = "data/" + region + "/otp/otp_run_dates.csv"
+    otp_run_path = "data/" + region + "/otp/itinerary/otp_run_dates.csv"
 
     # output_file_path
     output_file_path = "data/" + region + "/output/" + "measures_" + gtfs_date + "_" + "LOS" + ".csv"
@@ -66,9 +66,11 @@ def levelofservice(region, gtfs_date):
 
 
     # get the dates to compute the metric
-    otp_run = pd.read_csv(otp_run_path)
+    otp_run = pd.read_csv(otp_run_path, names = ["folder_date","run_date_weekday","run_date_saturday"])
+    otp_run = otp_run.drop_duplicates()
     otp_run = otp_run[otp_run["folder_date"] == gtfs_date]
 
+    print(otp_run)
 
     # the two dates for running the metric
     gtfs_date_wkd = datetime.datetime.strptime(otp_run["run_date_weekday"].item(), '%Y-%m-%d')
@@ -117,44 +119,46 @@ def levelofservice(region, gtfs_date):
 
             print(gtfs_path)
 
-            gtfs = GTFS.load_zip(gtfs_path)
-
-            # converting the stops file into a geopandas point dataframe
-            stops_geometry = [Point(xy) for xy in zip(gtfs.stops.stop_lon, gtfs.stops.stop_lat)]
-            stops_gdf = gtfs.stops.drop(['stop_lon', 'stop_lat'], axis=1)
-            stops_gdf = gpd.GeoDataFrame(stops_gdf, crs="EPSG:4326", geometry=stops_geometry)
-
-            # spatial join block group to stop points
-            stops_geoid = gpd.sjoin(stops_gdf, gdf, op="within")[["stop_id","GEOID"]]
-
-            # getting a unique list of block groups that have stops
-            unique_geoid = pd.DataFrame(stops_geoid.GEOID.unique(), columns = ["GEOID"])
-
-            # compute number of trips per block group, usinig the above function, and applied for each block group
-            date = gtfs_date_sat
-            print(date)
             try:
-                unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
-                print("Success")
-            except:
-                print("Failed")
-            output_sat.append(unique_geoid)
+                gtfs = GTFS.load_zip(gtfs_path)
 
-            date = gtfs_date_wkd
-            print(date)
-            try:
-                unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
-                print("Success")
-            except:
-                print("Failed")
-            output_wkd.append(unique_geoid)
+                # converting the stops file into a geopandas point dataframe
+                stops_geometry = [Point(xy) for xy in zip(gtfs.stops.stop_lon, gtfs.stops.stop_lat)]
+                stops_gdf = gtfs.stops.drop(['stop_lon', 'stop_lat'], axis=1)
+                stops_gdf = gpd.GeoDataFrame(stops_gdf, crs="EPSG:4326", geometry=stops_geometry)
 
+                # spatial join block group to stop points
+                stops_geoid = gpd.sjoin(stops_gdf, gdf, op="within")[["stop_id","GEOID"]]
+
+                # getting a unique list of block groups that have stops
+                unique_geoid = pd.DataFrame(stops_geoid.GEOID.unique(), columns = ["GEOID"])
+
+                # compute number of trips per block group, usinig the above function, and applied for each block group
+                date = gtfs_date_sat
+                print(date)
+                try:
+                    unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
+                    print("Success")
+                except:
+                    print("Failed")
+                output_sat.append(unique_geoid)
+
+                date = gtfs_date_wkd
+                print(date)
+                try:
+                    unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
+                    print("Success")
+                except:
+                    print("Failed")
+                output_wkd.append(unique_geoid)
+
+            except:
+                print("Loading failed :(")
 
 
             print(time.time() - start_time)
 
             print("-----------------------------")
-
 
 
 
@@ -194,6 +198,8 @@ def levelofservice(region, gtfs_date):
 
     # saving output
     output.to_csv(output_file_path, index = False)
+
+    print(output)
 
     print("meow :)")
 
@@ -259,8 +265,13 @@ def transit_accessibility(region, date, period):
 
     # zones with weird data that we need to smooth that didnt come up originally:
     also_missing = {
-        "New York": [360470193003,340170103004],
-        "Boston": []
+        "New York": ["360470193003","360610001001","340170103004"],
+        "Boston": [],
+        "Chicago": [],
+        "District of Columbia": ["110010092031"],
+        "Los Angeles": [],
+        "Philadelphia": [],
+        "San Francisco-Oakland": ["060411242001"]
     }
     also_missing = also_missing[region]
 
@@ -333,17 +344,32 @@ def transit_accessibility(region, date, period):
     start_time = time.time()
 
 
+
     # setting the periods for input and output
     period_times = period
     period_access = period
     if period_access == "MP":
         period_access = "AM"
 
+
     # load in the fares data for this time period
-    dff = pd.read_csv("data/" + region + "/otp/itinerary/fares/" + fare_date + "/period_" + period_times + ".csv", dtype={'origin_block': str, 'destination_block': str, 'fare_all': float, 'fare_lowcost': float})
-    dff = dff[["origin_block","destination_block","fare_all","fare_lowcost"]]
-    dff = dff.rename(columns = {"origin_block":"o_block"})
-    dff = dff.rename(columns = {"destination_block":"d_block"})
+    try:
+        dff = pd.read_csv("data/" + region + "/otp/itinerary/fares/period_MP.csv", dtype={'origin_block': str, 'destination_block': str, 'fare_all': float, 'fare_lowcost': float})
+        dff = dff[["origin_block","destination_block","fare_all","fare_lowcost"]]
+        dff = dff.rename(columns = {"origin_block":"o_block"})
+        dff = dff.rename(columns = {"destination_block":"d_block"})
+
+        if region == "Los Angeles" or region == "San Francisco-Oakland":
+
+            dff["o_block"] = "0" + dff["o_block"]
+
+            dff["d_block"] = "0" + dff["d_block"]
+
+    except:
+        dff = pd.read_csv("accessibility/fake_fares.csv", dtype={'origin_block': str, 'destination_block': str, 'fare_all': float, 'fare_lowcost': float})
+        dff = dff[["origin_block","destination_block","fare_all","fare_lowcost"]]
+        dff = dff.rename(columns = {"origin_block":"o_block"})
+        dff = dff.rename(columns = {"destination_block":"d_block"})
 
     # take the fare data into rounded floats for saving space
     # dff["fare_all"] = dff["fare_all"].astype(float)
@@ -361,18 +387,29 @@ def transit_accessibility(region, date, period):
     print("chunk size", n_chunks)
 
     # loop over the (8 or 2) travel time matrices in the study period (e.g. in AM, PM, WE)
-    i = 0
+    j = 0
     directory = "data/" + region + "/otp/itinerary/travel_times/" + date + "/period" + period_times + "/"
     for filename in os.listdir(directory):
         if filename.endswith(".csv"):
 
             travel_time_matrix = os.path.join(directory, filename)
-            i += 1
+
+            # only use 2 travel time matrices
+            if j == 2:
+                break
+            j += 1
+
 
             print("input time matrix", travel_time_matrix)
 
             # read in the travel time matrix
             dftall = pd.read_csv(travel_time_matrix, dtype=str)
+
+            if region == "Los Angeles" or region == "San Francisco-Oakland":
+
+                dftall["o_block"] = "0" + dftall["o_block"]
+
+                dftall["d_block"] = "0" + dftall["d_block"]
 
             print("n times:", dftall.shape[0])
 
@@ -796,6 +833,7 @@ def transit_accessibility(region, date, period):
                 i = i + 1
 
 
+
                 # # break for testing
                 # break
 
@@ -821,8 +859,8 @@ def transit_accessibility(region, date, period):
     # joing the two
     dfout = pd.concat([dfout_P,dfout_M])
 
-    # round result to one point
-    dfout["value_transit"] = dfout["value"].round(1)
+    # round result to 3 points
+    dfout["value_transit"] = dfout["value"].round(3)
     del dfout["value"]
 
 
@@ -835,6 +873,7 @@ def transit_accessibility(region, date, period):
     dfa = pd.read_csv("data/" + region + "/input/auto_travel_times/auto_accessibility.csv", dtype=str)
     dfa = pd.melt(dfa, id_vars = ["GEOID"])
     dfa["GEOID"] = dfa['GEOID'].astype(str)
+    dfa["value"] = dfa["value"].astype(float)
     dfa = dfa.replace(0, 1) # replacing 0 with 1 so we arent dividing by 0!)
 
 
@@ -868,12 +907,19 @@ def transit_accessibility(region, date, period):
     dfout.loc[dfout['value'] < 0, 'value'] = -1
 
     # round value outputs
-    dfout["value"] = dfout["value"].round(1)
+    dfout["value"] = dfout["value"].round(3)
 
     # updating column names
     dfout = dfout.rename(columns = {"GEOID":"bg_id"})
     dfout = dfout.rename(columns = {"value":"score"})
     dfout = dfout.rename(columns = {"measure":"score_key"})
+
+    # is in LA islands (these had weird results)
+    if region == "Los Angeles":
+        la_islands = ["061110036121","061119800001","060375991001","060375991002","060375990003","060375990004","060375990002","060375990001"]
+        for island in la_islands:
+            dfout.loc[dfout['bg_id'] == island, 'score'] = np.nan
+
 
     # data output
     out_file_name = "data/" + region + "/output/" + "measures_" + date + "_" + period + ".csv"
