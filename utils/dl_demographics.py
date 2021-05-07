@@ -75,6 +75,7 @@ def dl(region):
 
     df = pd.concat(dfs)
 
+
     # creating a combined block group csv
     df["geoid"] = df["state"] + df["county"] + df["tract"] + df["block group"]
     del df["state"], df["county"], df["tract"], df["block group"]
@@ -95,18 +96,20 @@ def dl(region):
 
     df.drop(variables, inplace=True, axis=1) # dropping unneeded variables
 
-
-
-
     # bringing in the data that are only at CT
 
-    dfid = pd.read_csv(block_group_ids_path)
+    dfid = pd.read_csv(block_group_ids_path, dtype=str)
+
+
 
     dfid = dfid[["GEOID"]]
     dfid["GEOID"] = dfid["GEOID"].astype(str)
     dfid["CT"] = dfid["GEOID"].str[:-1]
 
     df = pd.merge(df,dfid,left_on ="geoid", right_on ="GEOID", how = "left")
+
+
+
 
     # loop over each county, downloading data from census
     dfs = []
@@ -132,8 +135,6 @@ def dl(region):
     df["hhld_nocar"] = df["hhld_nocar"].astype(int)
 
     df.drop(["hhld_total_ct","CT","GEOID"], inplace=True, axis=1)
-
-
 
 
 
@@ -198,7 +199,7 @@ def dots(region):
     # reading in demographic and polygon data
     gdf = gpd.read_file(block_group_path)
     gdf["GEOID"] = gdf["GEOID"].astype(str)
-    dfd = pd.read_csv(demo_data_path + demo_file_name)
+    dfd = pd.read_csv(demo_data_path + demo_file_name, dtype=str)
     dfd["geoid"] = dfd["geoid"].astype(str)
     gdf = pd.merge(gdf,dfd, left_on = "GEOID", right_on = "geoid")
 
@@ -209,8 +210,8 @@ def dots(region):
         # loop over each variable, getting number of dots to generate
         while i < len(demo_vars):
             var = demo_vars[i]
-            N = row[demo_vars[i]]
-            dots_per_N = demo_dot_counts[i]
+            N = float(row[demo_vars[i]])
+            dots_per_N = float(demo_dot_counts[i])
             try:
                 n_dots = round(N/dots_per_N)
             except:
