@@ -1,14 +1,51 @@
 import acc
+from multiprocessing import Pool
 
 
-def compute_region_date(region, date):
-    # acc.transit_accessibility(region, date, "MP")
-    # acc.transit_accessibility(region_in, date_in, "PM")
-    # acc.transit_accessibility(region_in, date_in, "WE")
-    acc.levelofservice(region, date)
-    # return None
+# python3 accessibility/compute_transit_accessibility.py
 
-# compute_region_date("New York", "2020-02-23")
-# compute_region_date("New York", "2020-05-10")
-# compute_region_date("New York", "2020-09-20")
-compute_region_date("New York", "2020-10-11")
+region = "District of Columbia"
+dates = ("2020-02-23","2020-03-15","2020-04-19","2020-05-10","2020-06-21","2020-07-19","2020-08-16","2020-09-20","2020-10-18","2020-11-15","2020-12-20","2021-01-17","2021-02-21")
+#
+# region = "New York"
+# dates = ("2020-02-23","2020-03-15","2020-04-19","2020-05-17","2020-06-21","2020-07-19","2020-08-16","2020-09-20","2020-10-18","2020-11-15","2020-12-20","2021-01-17","2021-02-21")
+
+# region = "Philadelphia"
+# dates = ("2020-02-23","2020-03-15","2020-04-19","2020-05-17","2020-06-21","2020-07-19","2020-08-16","2020-09-20","2020-10-18","2020-11-15","2020-12-20","2021-01-17","2021-02-21")
+
+# region = "Boston"
+# dates = ("2020-02-23","2020-03-15","2020-04-19","2020-05-10","2020-06-21","2020-07-19","2020-08-16","2020-09-20","2020-10-18","2020-11-15","2020-12-20","2021-01-17","2021-02-21")
+
+# region = "Los Angeles"
+# dates = ("2020-02-23","2020-03-15","2020-04-19","2020-05-10","2020-06-21","2020-07-19","2020-08-16","2020-09-20","2020-10-18","2020-11-15","2020-12-20","2021-01-17","2021-02-21")
+
+# region = "Chicago"
+# dates = ("2020-02-23","2020-03-15","2020-04-19","2020-05-10","2020-06-21","2020-07-19","2020-08-16","2020-09-20","2020-10-18","2020-11-15","2020-12-20","2021-01-17","2021-02-21")
+
+# region = "San Francisco-Oakland"
+# dates = ("2020-02-23","2020-03-15","2020-04-19","2020-05-10","2020-06-21","2020-07-19","2020-08-16","2020-09-20","2020-10-18","2020-11-22","2020-12-20","2021-01-10","2021-02-21")
+
+def compute_accessibility(date):
+    print(region, date)
+    acc.transit_accessibility(region, date, "MP")
+    acc.transit_accessibility(region, date, "PM")
+    acc.transit_accessibility(region, date, "WE")
+
+def compute_tlos(date):
+    print(region, date)
+    acc.levelofservice(region,date)
+
+def compute_both(date):
+    print(region, date)
+    compute_accessibility(date)
+    compute_tlos(date)
+
+if __name__ == '__main__':
+    with Pool(13) as p:
+        p.map(compute_tlos, dates)
+
+
+# region = "Los Angeles"
+# compute_accessibility("2020-02-23")
+#
+#
