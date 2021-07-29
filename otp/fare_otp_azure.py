@@ -83,7 +83,15 @@ def call_otp():
     return p
 
 # function to return the itineraries
-def return_itineraries(ox,oy,dx,dy,date_us,hr,minute):
+def return_itineraries(param):
+
+    ox = param[0]
+    oy = param[1]
+    dx = param[2]
+    dy = param[3]
+    date_us = param[4]
+    hr = param[5]
+    minute = param[6]
 
 	# parameters
     options = {
@@ -109,7 +117,15 @@ def return_itineraries(ox,oy,dx,dy,date_us,hr,minute):
     return data
 
 # function to return the lowcost itineraries
-def return_lowcost(ox,oy,dx,dy,date_us,hr,minute):
+def return_lowcost(param):
+
+    ox = param[0]
+    oy = param[1]
+    dx = param[2]
+    dy = param[3]
+    date_us = param[4]
+    hr = param[5]
+    minute = param[6]
 
 	# parameters
     options = {
@@ -303,29 +319,28 @@ if __name__ == '__main__':
             
             # parralelizing the otp plan call
             with concurrent.futures.ThreadPoolExecutor() as executor:
+
                 for i in range(threads):
-                    thread_lst.append(executor.submit(return_itineraries, param[i][0],  param[i][1],  param[i][2],  param[i][3], 
-                                                      param[i][4], param[i][5], param[i][6]))
-                    
+                     thread_lst.append(executor.submit(return_itineraries, param))
                 for f in concurrent.futures.as_completed(thread_lst):
-                    # retrieving the information from each thread for the otp call
-                    try:
-                        result.append(f.result())
-                    except:
-                        pass
+                     # retrieving the information from each thread for the otp call
+                     try:
+                         result.append(f.result())
+                     except:
+                         pass
             
             #lowcost network calculations
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                for i in range(threads):
-                    thread_lst_lowcost.append(executor.submit(return_lowcost, param[i][0],  param[i][1],  param[i][2],  param[i][3], 
-                                                      param[i][4], param[i][5], param[i][6]))
-                    
+                 for i in range(threads):
+                     thread_lst_lowcost.append(executor.submit(return_lowcost, param))
                 for f in concurrent.futures.as_completed(thread_lst_lowcost):
-                    # retrieving the information from each thread for the otp call
-                    try:
-                        result_lowcost.append(f.result())
-                    except:
-                        pass
+                     # retrieving the information from each thread for the otp call
+                     try:
+                         result_lowcost.append(f.result())
+                     except:
+                         pass
+                    
+
                     
             start = start + threads
             
