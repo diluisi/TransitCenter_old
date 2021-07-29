@@ -76,7 +76,6 @@ def levelofservice(region, gtfs_date):
     gtfs_date_wkd = datetime.datetime.strptime(otp_run["run_date_weekday"].item(), '%Y-%m-%d')
     gtfs_date_sat = datetime.datetime.strptime(otp_run["run_date_saturday"].item(), '%Y-%m-%d')
 
-
     # crs dictionary needed for polygon buffering
     crs = {
         "Boston": 'epsg:32619',
@@ -106,6 +105,7 @@ def levelofservice(region, gtfs_date):
         n_trips = len(trips_at_stops_temp.index)
         return n_trips
 
+
     # empty output list
     output_sat = []
     output_wkd = []
@@ -132,17 +132,21 @@ def levelofservice(region, gtfs_date):
 
                 # getting a unique list of block groups that have stops
                 unique_geoid = pd.DataFrame(stops_geoid.GEOID.unique(), columns = ["GEOID"])
+                unique_geoid_2 = pd.DataFrame(stops_geoid.GEOID.unique(), columns = ["GEOID"])
 
                 # compute number of trips per block group, usinig the above function, and applied for each block group
+
+                # for saturday
                 date = gtfs_date_sat
                 print(date)
                 try:
-                    unique_geoid["n_trips"] = unique_geoid["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
+                    unique_geoid_2["n_trips"] = unique_geoid_2["GEOID"].swifter.apply(trips_by_block, args=(gtfs,stops_geoid,date,))
                     print("Success")
                 except:
                     print("Failed")
-                output_sat.append(unique_geoid)
+                output_sat.append(unique_geoid_2)
 
+                # for a weekday
                 date = gtfs_date_wkd
                 print(date)
                 try:
@@ -152,6 +156,9 @@ def levelofservice(region, gtfs_date):
                     print("Failed")
                 output_wkd.append(unique_geoid)
 
+
+
+
             except:
                 print("Loading failed :(")
 
@@ -159,6 +166,7 @@ def levelofservice(region, gtfs_date):
             print(time.time() - start_time)
 
             print("-----------------------------")
+
 
 
 
@@ -184,8 +192,8 @@ def levelofservice(region, gtfs_date):
     output_wkd.columns = ["bg_id","score"]
 
     # add column for measure name
-    output_sat["score_key"] = "los_trips_WKD"
-    output_wkd["score_key"] = "los_trips_SAT"
+    output_sat["score_key"] = "los_trips_SAT"
+    output_wkd["score_key"] = "los_trips_WKD"
 
     # adding in a field for date
     output_sat["date"] = gtfs_date
